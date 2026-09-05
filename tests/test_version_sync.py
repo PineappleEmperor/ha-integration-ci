@@ -80,7 +80,7 @@ def test_a_single_declaration_warns_rather_than_passing_silently(tmp_path) -> No
 
 
 def test_the_thin_warning_names_only_files_a_consumer_carries(tmp_path) -> None:
-    """A pointer-model consumer has no workflow that declares a version."""
+    """A consumer's own workflows are callers and declare no version."""
     (tmp_path / "pyproject.toml").write_text('[tool.ruff]\ntarget-version = "py314"\n')
     warns = vs.thin(tmp_path)
     assert len(warns) == 1

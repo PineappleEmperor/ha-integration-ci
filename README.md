@@ -2,8 +2,8 @@
 
 The single home of the three [reusable workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows)
 that define what a validated Home Assistant custom integration is, and of the audit
-scripts they run. The sections below say what each workflow does, what a consumer copies,
-what the audit checks, and how a release of this repository reaches consumers.
+scripts they run. The sections below say what each workflow does, how a consumer calls
+it, what the audit checks, and how a release of this repository reaches consumers.
 
 ## The three workflows
 
@@ -50,62 +50,111 @@ step runs against the consumer's own checkout.
   than typed because an unsubstituted `<domain>` placeholder in a `run:` block is a bash
   redirect, and a published release once died on exactly that with no asset attached.
 
-## The pointers
+## Calling the workflows
 
-`pointers/` holds one example per workflow, ready to copy into an integration's
-`.github/workflows/` under the same filename:
-
-| Pointer | Job id | Check-run name | Required context? |
-|---|---|---|---|
-| `pointers/python-validate.yml` | `validate` | `validate / Ruff, Pyright and Pytest` | yes |
-| `pointers/quality-audit.yml` | `audit` | `audit / ha-integration conformance check` | yes |
-| `pointers/release.yml` | `release` | `release / Auto release zip` | no, it runs on publish |
-
-A pointer is the original workflow's triggers and permissions around a single job:
+An integration carries one caller workflow per reusable workflow in its own
+`.github/workflows/`, under the same filename: the trigger and permissions around a
+single job that `uses:` the workflow here. These three are the callers, complete:
 
 ```yaml
+# .github/workflows/python-validate.yml
+name: Python Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   validate:
-    uses: PineappleEmperor/ha-integration-ci/.github/workflows/python-validate.yml@ae1131548e7428e9e18dff179269ad29dbaa0bb8 # v1.0.0rc1
+    uses: PineappleEmperor/ha-integration-ci/.github/workflows/python-validate.yml@{{sha}} # {{tag}}
 ```
 
-`pointers/release.yml` grants `contents: write` because the called workflow uploads the
-zip to the release; a called workflow can only narrow what its caller grants.
+```yaml
+# .github/workflows/quality-audit.yml
+name: Skill Audit
 
-The SHA is the commit a tag of this repository points at and the comment is that tag;
-a pin at a SHA that no tag names is a run GitHub refuses. No pin is ever a placeholder.
+on:
+  push:
+    branches: [main]
+  pull_request:
 
-GitHub names a check-run from a reusable workflow `<caller job id> / <called job name>`,
-so a consumer's ruleset requires the names in the table, not the bare job names the
-copied workflows produced. `check_required_contexts_have_producers` understands a pointer
-job as the prefix it produces.
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    uses: PineappleEmperor/ha-integration-ci/.github/workflows/quality-audit.yml@{{sha}} # {{tag}}
+```
+
+```yaml
+# .github/workflows/release.yml
+name: Create Release ZIP
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: PineappleEmperor/ha-integration-ci/.github/workflows/release.yml@{{sha}} # {{tag}}
+```
+
+`{{tag}}` and `{{sha}}` resolve as release-flow's README says under Calling the
+workflows, against this repository:
+
+```
+TAG=$(gh api repos/PineappleEmperor/ha-integration-ci/releases/latest --jq .tag_name)
+SHA=$(gh api "repos/PineappleEmperor/ha-integration-ci/commits/$TAG" --jq .sha)
+```
+
+The release caller grants `contents: write` because the called workflow uploads the zip
+to the release; a called workflow can only narrow what its caller grants.
+
+Named by GitHub's rule for called workflows (release-flow's README, Check names), the
+job ids above give a consumer's ruleset these contexts:
+
+| Caller job | Check-run name | Required context? |
+|---|---|---|
+| `validate` | `validate / Ruff, Pyright and Pytest` | yes |
+| `audit` | `audit / ha-integration conformance check` | yes |
+| `release` | `release / Auto release zip` | no, it runs on publish |
+
+`check_required_contexts_have_producers` understands a caller job as the prefix it
+produces.
 
 ## What the audit checks now
 
 `python3 scripts/skill_audit.py --list` prints the registry; the list below is the shape
 of it, not a substitute.
 
-- **The pointers.** `check_canonical_files` requires `pr-checks.yml`, `lint-pr.yml`,
+- **The callers.** `check_canonical_files` requires `pr-checks.yml`, `lint-pr.yml`,
   `python-validate.yml`, `quality-audit.yml`, `dependency-review.yml` and
   `release-drafter.yml` in every repo, with `.github/release-drafter.yml`,
   `.github/dependabot.yml` and `.gitignore` beside them; `hacs-validate.yml`,
   `hassfest-validate.yml` and `release.yml` in an integration; `panel-bundle.yml` once
   `frontend/package.json` exists; and refuses the superseded `frontend_build.yml`.
-  `check_pointers` requires each pointer's `uses:` to name the repository and workflow
+  `check_callers` requires each caller's `uses:` to name the repository and workflow
   path it stands for (`release-flow` for `pr-checks`, `lint-pr`, `release-drafter` and
   `auto-draft-pr`, this repository for `python-validate`, `quality-audit` and `release`,
   `ha-panel-ci` for `panel-bundle`) and to carry no body; a file whose only trigger is
   `workflow_call` is a body in the repository that owns it, not a copy, and is skipped.
-  `check_action_pins` holds every `uses:` line, pointer or step, to a 40-hex SHA with a
-  version comment. `dependency-review`, HACS and hassfest are settings over a third-party
+  `check_action_pins` holds every `uses:` line, caller or step, to a 40-hex SHA with a
+  version comment, so a `{{sha}}` copied unresolved from a README fails. `dependency-review`, HACS and hassfest are settings over a third-party
   action and stay plain files; nothing of theirs is versioned by a repository of ours.
 - **Whatever workflow bodies the consumer still carries.** No `<placeholder>` in a `run:`,
   `with:` or `env:` value; no `${{ }}` inside a `run:`; a `setup-python` step before any
   step that runs Python, per job; one writer of the release body; `pull_request_target`
   on `pr-checks.yml`; no second labeler; no unsanctioned `gh pr create`. A check that
-  reads a body skips a pointer, because the body it would read lives in the repository
-  the pointer names and is judged there; the checks that read triggers still apply to
-  a pointer, because the triggers are the pointer's own.
+  reads a body skips a caller, because the body it would read lives in the repository
+  the caller names and is judged there; the checks that read triggers still apply to
+  a caller, because the triggers are the caller's own.
 - **The integration itself.** `PLATFORMS` names with no module beside them, deprecated
   APIs, bare `# type: ignore`, multi-line docstrings on functions and classes, the
   canonical `quality_scale.yaml` rule set, manifest honesty (`integration_type`,
@@ -125,7 +174,7 @@ of it, not a substitute.
 the consumer's own `.github/workflows/`, the three reusable workflows in the
 `.ha-integration-ci/` checkout beside it, ruff's `target-version` and
 `pyrightconfig.json`, and requires the test harness to be pinned. A consumer's own
-workflows are pointers and declare nothing, so the comparison that matters is its floor
+workflows are callers and declare nothing, so the comparison that matters is its floor
 against the CI it runs; this repository's own `ci.yml` is read by its own CI, not by a
 consumer's.
 
@@ -168,11 +217,11 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
 
 ## This repository's own PR gate
 
-The commit-title, labelling and release-drafting workflows this repository's PRs should
-run under (`pr-checks`, `lint-pr`, the draft-PR opener, the release drafter) live in
-[PineappleEmperor/release-flow](https://github.com/PineappleEmperor/release-flow), which
-is generic to any repository using Conventional Commits. Those pointers are not added
-here yet; until they are, `ci.yml` is the only required check here.
+This repository is a consumer of
+[PineappleEmperor/release-flow](https://github.com/PineappleEmperor/release-flow) like
+any other: its `.github/workflows/` carries release-flow's four callers, its
+`.github/release-drafter.yml` and `.githooks/commit-msg` are the copies that README
+lists, and `RELEASE_TOKEN` is set. `ci.yml` is its own.
 
 ## Working on this repository
 

@@ -12,7 +12,7 @@ PHCC = re.compile(
 )
 RUFF_TARGET = re.compile(r'target-version\s*=\s*"py(?P<major>\d)(?P<minor>\d+)"')
 PY_VERSION = re.compile(r'python-version:\s*["\']?(?P<version>\d+\.\d+)')
-# The reusable workflows a consumer runs from this repository, by pointer.
+# The reusable workflows a consumer calls from this repository.
 REUSABLE = ("python-validate.yml", "quality-audit.yml", "release.yml")
 
 

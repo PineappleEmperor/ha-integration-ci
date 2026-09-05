@@ -30,8 +30,8 @@ def _wf(repo, name, body):
     (repo / ".github/workflows" / name).write_text(body)
 
 
-def _pointer(target: str, job: str = "validate", on: str = "pull_request:") -> str:
-    """A pointer workflow: one job whose `uses:` calls `target` at the placeholder SHA."""
+def _caller(target: str, job: str = "validate", on: str = "pull_request:") -> str:
+    """A caller workflow: one job whose `uses:` calls `target` at a SHA."""
     return f"on:\n  {on}\njobs:\n  {job}:\n    uses: {target}@{_SHA} # v1.0.0\n"
 
 
@@ -65,60 +65,60 @@ def test_the_superseded_frontend_workflow_is_refused(repo) -> None:
     assert any("frontend_build.yml" in f and "panel-bundle.yml" in f for f in fails)
 
 
-def test_a_pointer_at_the_expected_workflow_passes(repo) -> None:
-    """The healthy state: each pointer calls the workflow it stands for, by SHA."""
-    _wf(repo, "python-validate.yml", _pointer(f"{_CI}/python-validate.yml"))
-    _wf(repo, "quality-audit.yml", _pointer(f"{_CI}/quality-audit.yml", "audit"))
-    _wf(repo, "release.yml", _pointer(f"{_CI}/release.yml", "release", "release:"))
-    assert audit.check_pointers(audit.Repo(repo)) == ([], [])
+def test_a_caller_at_the_expected_workflow_passes(repo) -> None:
+    """The healthy state: each caller calls the workflow it stands for, by SHA."""
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    _wf(repo, "quality-audit.yml", _caller(f"{_CI}/quality-audit.yml", "audit"))
+    _wf(repo, "release.yml", _caller(f"{_CI}/release.yml", "release", "release:"))
+    assert audit.check_callers(audit.Repo(repo)) == ([], [])
     assert audit.check_action_pins(audit.Repo(repo)) == ([], [])
 
 
-def test_a_pointer_at_the_wrong_repository_fails(repo) -> None:
-    """A pointer at someone else's workflow runs someone else's CI under this name."""
+def test_a_caller_at_the_wrong_repository_fails(repo) -> None:
+    """A caller of someone else's workflow runs someone else's CI under this name."""
     _wf(
         repo,
         "python-validate.yml",
-        _pointer("someone/else/.github/workflows/python-validate.yml"),
+        _caller("someone/else/.github/workflows/python-validate.yml"),
     )
-    fails, _ = audit.check_pointers(audit.Repo(repo))
+    fails, _ = audit.check_callers(audit.Repo(repo))
     assert len(fails) == 1
     assert "someone/else" in fails[0] and f"{_CI}/python-validate.yml" in fails[0]
 
 
-def test_a_pointer_at_the_wrong_path_fails(repo) -> None:
+def test_a_caller_at_the_wrong_path_fails(repo) -> None:
     """The right repository but another of its workflows is still the wrong check."""
-    _wf(repo, "quality-audit.yml", _pointer(f"{_CI}/python-validate.yml", "audit"))
-    fails, _ = audit.check_pointers(audit.Repo(repo))
+    _wf(repo, "quality-audit.yml", _caller(f"{_CI}/python-validate.yml", "audit"))
+    fails, _ = audit.check_callers(audit.Repo(repo))
     assert len(fails) == 1 and f"{_CI}/quality-audit.yml" in fails[0]
 
 
-def test_a_pointer_carrying_a_body_fails(repo) -> None:
-    """A pointer job carrying a body."""
+def test_a_caller_carrying_a_body_fails(repo) -> None:
+    """A caller job carrying a body."""
     _wf(
         repo,
         "release.yml",
         "on:\n  release:\njobs:\n  build:\n    steps:\n      - run: zip -r out.zip .\n",
     )
-    fails, _ = audit.check_pointers(audit.Repo(repo))
+    fails, _ = audit.check_callers(audit.Repo(repo))
     assert len(fails) == 1 and "release.yml" in fails[0] and "body" in fails[0]
 
 
-def test_a_pointer_is_held_to_the_pin_shape(repo) -> None:
-    """A pointer's `uses:` is an action ref like any other: SHA plus a version comment."""
+def test_a_caller_is_held_to_the_pin_shape(repo) -> None:
+    """A caller's `uses:` is an action ref like any other: SHA plus a version comment."""
     _wf(
         repo,
         "python-validate.yml",
         f"jobs:\n  validate:\n    uses: {_CI}/python-validate.yml@v1\n",
     )
-    assert audit.check_pointers(audit.Repo(repo)) == ([], [])
+    assert audit.check_callers(audit.Repo(repo)) == ([], [])
     fails, _ = audit.check_action_pins(audit.Repo(repo))
     assert len(fails) == 1 and "not pinned to a commit SHA" in fails[0]
 
 
-def test_an_absent_pointer_is_the_canonical_check_s_concern(repo) -> None:
-    """check_pointers judges the pointers a repo carries; absence is reported once, elsewhere."""
-    assert audit.check_pointers(audit.Repo(repo)) == ([], [])
+def test_an_absent_caller_is_the_canonical_check_s_concern(repo) -> None:
+    """check_callers judges the callers a repo carries; absence is reported once, elsewhere."""
+    assert audit.check_callers(audit.Repo(repo)) == ([], [])
 
 
 def test_a_reusable_workflow_body_is_a_definition_not_a_copy(repo) -> None:
@@ -128,18 +128,18 @@ def test_a_reusable_workflow_body_is_a_definition_not_a_copy(repo) -> None:
         "release.yml",
         "on:\n  workflow_call:\njobs:\n  build:\n    steps:\n      - run: zip -r out.zip .\n",
     )
-    assert audit.check_pointers(audit.Repo(repo)) == ([], [])
+    assert audit.check_callers(audit.Repo(repo)) == ([], [])
 
     _wf(
         repo,
         "release.yml",
         "on:\n  workflow_call:\n  release:\njobs:\n  build:\n    steps:\n      - run: zip -r out.zip .\n",
     )
-    fails, _ = audit.check_pointers(audit.Repo(repo))
+    fails, _ = audit.check_callers(audit.Repo(repo))
     assert len(fails) == 1 and "body" in fails[0]
 
 
-def test_every_release_flow_pointer_is_judged(repo) -> None:
+def test_every_release_flow_caller_is_judged(repo) -> None:
     """The drafter and the draft opener are release-flow's too; a body in their place is a copy."""
     _rf = "PineappleEmperor/release-flow/.github/workflows"
     for name in ("release-drafter.yml", "auto-draft-pr.yml"):
@@ -148,14 +148,14 @@ def test_every_release_flow_pointer_is_judged(repo) -> None:
             name,
             "on:\n  push:\njobs:\n  x:\n    steps:\n      - run: gh pr create\n",
         )
-    fails, _ = audit.check_pointers(audit.Repo(repo))
+    fails, _ = audit.check_callers(audit.Repo(repo))
     assert len(fails) == 2
     assert any(f"{_rf}/release-drafter.yml" in f for f in fails)
     assert any(f"{_rf}/auto-draft-pr.yml" in f for f in fails)
 
 
-def test_the_drafter_pointer_is_canonical(repo) -> None:
-    """The release model depends on the drafter, so a repo without its pointer is incomplete."""
+def test_the_drafter_caller_is_canonical(repo) -> None:
+    """The release model depends on the drafter, so a repo without its caller is incomplete."""
     fails, _ = audit.check_canonical_files(audit.Repo(repo))
     assert any("workflows/release-drafter.yml" in f for f in fails)
 
@@ -163,6 +163,17 @@ def test_the_drafter_pointer_is_canonical(repo) -> None:
 def test_bare_tag_pins_fail(repo) -> None:
     """A tag can be repointed at new code that runs with the workflow's token."""
     _wf(repo, "a.yml", "jobs:\n  x:\n    steps:\n      - uses: actions/checkout@v7\n")
+    fails, _ = audit.check_action_pins(audit.Repo(repo))
+    assert len(fails) == 1 and "not pinned to a commit SHA" in fails[0]
+
+
+def test_an_unfilled_readme_token_fails(repo) -> None:
+    """The `{{sha}} # {{tag}}` a README usage block carries, copied without resolving it."""
+    _wf(
+        repo,
+        "pr-checks.yml",
+        f"jobs:\n  pr:\n    uses: {_CI}/pr-checks.yml@{{{{sha}}}} # {{{{tag}}}}\n",
+    )
     fails, _ = audit.check_action_pins(audit.Repo(repo))
     assert len(fails) == 1 and "not pinned to a commit SHA" in fails[0]
 
@@ -209,10 +220,10 @@ def test_two_release_body_writers_fail(repo) -> None:
     )
 
 
-def test_a_zip_release_pointer_is_trusted_to_patch_the_manifest(repo) -> None:
-    """The step that writes the tag into the manifest lives in the workflow pointed at."""
+def test_a_zip_release_caller_is_trusted_to_patch_the_manifest(repo) -> None:
+    """The step that writes the tag into the manifest lives in the workflow called."""
     (repo / "hacs.json").write_text('{"zip_release": true}')
-    _wf(repo, "release.yml", _pointer(f"{_CI}/release.yml", "release", "release:"))
+    _wf(repo, "release.yml", _caller(f"{_CI}/release.yml", "release", "release:"))
     assert audit.check_zip_release_patches_manifest(audit.Repo(repo)) == ([], [])
 
 
@@ -269,12 +280,12 @@ def test_the_underscore_spelling_is_still_found(repo) -> None:
     assert any("auto_draft_pr.yml must gate on the actor" in f for f in fails)
 
 
-def test_an_opener_pointer_is_judged_where_its_body_lives(repo) -> None:
-    """A pointer at the opener has no actor gate or --draft to read; its body is elsewhere."""
+def test_an_opener_caller_is_judged_where_its_body_lives(repo) -> None:
+    """A caller of the opener has no actor gate or --draft to read; its body is elsewhere."""
     _wf(
         repo,
         "auto-draft-pr.yml",
-        _pointer(
+        _caller(
             "PineappleEmperor/release-flow/.github/workflows/auto-draft-pr.yml",
             "draft",
             "push:",
@@ -328,7 +339,7 @@ def _tested_integration(tmp_path) -> pathlib.Path:
 def test_a_pytest_pointer_proves_the_suite_runs(tmp_path) -> None:
     """The pytest step lives in python-validate.yml here; the pointer at it is the proof."""
     root = _tested_integration(tmp_path)
-    _wf(root, "python-validate.yml", _pointer(f"{_CI}/python-validate.yml"))
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
     assert audit.check_claims_have_tests(audit.Repo(root)) == ([], [])
 
 
@@ -383,7 +394,7 @@ def test_the_copy_model_checks_are_gone() -> None:
         "_template_dir",
     }
     assert not gone & set(dir(audit))
-    assert "check_pointers" in {c.__name__ for c in audit.CHECKS}
+    assert "check_callers" in {c.__name__ for c in audit.CHECKS}
 
 
 def test_a_third_pr_opener_is_still_refused(repo) -> None:
@@ -475,8 +486,8 @@ def test_an_ignored_hacs_check_fails(repo) -> None:
     assert len(fails) == 1 and "hacs-validate.yml" in fails[0]
 
 
-def test_a_drafter_pointer_is_judged_on_its_triggers_only(repo) -> None:
-    """The drafter's wiring lives in release-flow; the pointer owns just the triggers."""
+def test_a_drafter_caller_is_judged_on_its_triggers_only(repo) -> None:
+    """The drafter's wiring lives in release-flow; the caller owns just the triggers."""
     target = "PineappleEmperor/release-flow/.github/workflows/release-drafter.yml"
     _wf(
         repo,
@@ -489,8 +500,8 @@ def test_a_drafter_pointer_is_judged_on_its_triggers_only(repo) -> None:
     assert audit.check_sole_labeler(audit.Repo(repo)) == ([], [])
 
 
-def test_a_drafter_pointer_on_pull_request_is_a_second_labeler(repo) -> None:
-    """The trigger set is the pointer's own, so the sole-labeler rule still bites there."""
+def test_a_drafter_caller_on_pull_request_is_a_second_labeler(repo) -> None:
+    """The trigger set is the caller's own, so the sole-labeler rule still bites there."""
     target = "PineappleEmperor/release-flow/.github/workflows/release-drafter.yml"
     _wf(
         repo,
@@ -582,16 +593,16 @@ def test_a_job_without_a_name_is_known_by_its_id(repo) -> None:
     assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
 
 
-def test_a_pointer_job_produces_the_prefixed_context(repo) -> None:
+def test_a_caller_job_produces_the_prefixed_context(repo) -> None:
     """A job calling a reusable workflow."""
-    _wf(repo, "python-validate.yml", _pointer(f"{_CI}/python-validate.yml"))
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
     _ruleset(repo, "validate / Ruff, Pyright and Pytest")
     assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
 
 
-def test_a_pointer_job_never_reports_under_its_bare_id(repo) -> None:
-    """A ruleset naming the pointer job alone waits on a check-run GitHub never creates."""
-    _wf(repo, "python-validate.yml", _pointer(f"{_CI}/python-validate.yml"))
+def test_a_caller_job_never_reports_under_its_bare_id(repo) -> None:
+    """A ruleset naming the caller job alone waits on a check-run GitHub never creates."""
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
     _ruleset(repo, "validate")
     fails, _ = audit.check_required_contexts_have_producers(audit.Repo(repo))
     assert len(fails) == 1 and "'validate'" in fails[0]
@@ -642,9 +653,9 @@ def test_live_ruleset_orphan_fails(repo, monkeypatch) -> None:
     )
 
 
-def test_live_check_knows_a_pointer_by_its_prefix(repo, monkeypatch) -> None:
-    """The live ruleset names `audit / ha-integration conformance check`; the pointer produces it."""
-    _wf(repo, "quality-audit.yml", _pointer(f"{_CI}/quality-audit.yml", "audit"))
+def test_live_check_knows_a_caller_by_its_prefix(repo, monkeypatch) -> None:
+    """The live ruleset names `audit / ha-integration conformance check`; the caller produces it."""
+    _wf(repo, "quality-audit.yml", _caller(f"{_CI}/quality-audit.yml", "audit"))
 
     class _Fake:
         def __init__(self, out, rc=0):
@@ -764,10 +775,10 @@ def test_title_check_on_the_base_ref_passes(repo) -> None:
 def test_a_pr_checks_pointer_owns_only_its_trigger(repo) -> None:
     """The label and title-check jobs live in release-flow; the pointer owns the event."""
     target = "PineappleEmperor/release-flow/.github/workflows/pr-checks.yml"
-    _wf(repo, "pr-checks.yml", _pointer(target, "checks", "pull_request_target:"))
+    _wf(repo, "pr-checks.yml", _caller(target, "checks", "pull_request_target:"))
     assert audit.check_pr_checks_shape(audit.Repo(repo)) == ([], [])
 
-    _wf(repo, "pr-checks.yml", _pointer(target, "checks", "pull_request:"))
+    _wf(repo, "pr-checks.yml", _caller(target, "checks", "pull_request:"))
     fails, _ = audit.check_pr_checks_shape(audit.Repo(repo))
     assert len(fails) == 1 and "pull_request_target" in fails[0]
 
@@ -808,11 +819,11 @@ def test_a_job_the_base_branch_defines_is_not_an_orphan(tmp_path) -> None:
     assert audit.check_required_contexts_have_producers(audit.Repo(work)) == ([], [])
 
 
-def test_a_pointer_the_base_branch_defines_is_not_an_orphan(tmp_path) -> None:
-    """The base branch's pointer jobs count by prefix, the same as the working tree's."""
+def test_a_caller_the_base_branch_defines_is_not_an_orphan(tmp_path) -> None:
+    """The base branch's caller jobs count by prefix, the same as the working tree's."""
     work = _cloned_repo(
         tmp_path,
-        _pointer(
+        _caller(
             "PineappleEmperor/release-flow/.github/workflows/pr-checks.yml",
             "checks",
             "pull_request_target:",

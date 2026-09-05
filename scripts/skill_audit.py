@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Skill-conformance audit: verify the ha-integration skill was actually followed.
 
-Pointer workflows present and aimed at the reusable workflow each stands for, action
+Caller workflows present and aimed at the reusable workflow each calls, action
 pins current, antipatterns absent, quality_scale honest. The mechanical subset of the
 audit; the judgement items in the skill's reference/audit.md still need an agent with the
 skill on disk. Exit 1 on any FAIL. Runs locally and in CI, where quality-audit.yml checks
@@ -38,9 +38,9 @@ CANONICAL = (
     "release-drafter",
 )
 INTEGRATION_ONLY = ("hacs-validate", "hassfest-validate", "release")
-# The reusable workflow each pointer file must call. auto-draft-pr is judged when
-# carried, never required.
-POINTERS = {
+# The reusable workflow each caller must call. auto-draft-pr is judged when carried,
+# never required.
+CALLERS = {
     "pr-checks.yml": "PineappleEmperor/release-flow/.github/workflows/pr-checks.yml",
     "lint-pr.yml": "PineappleEmperor/release-flow/.github/workflows/lint-pr.yml",
     "release-drafter.yml": (
@@ -194,7 +194,7 @@ def _live(run: str) -> str:
     )
 
 
-def _is_pointer(doc: dict) -> bool:
+def _is_caller(doc: dict) -> bool:
     """Whether every job in a parsed workflow calls another workflow instead of running steps."""
     jobs = doc.get("jobs") or {}
     return bool(jobs) and all(
@@ -205,7 +205,7 @@ def _is_pointer(doc: dict) -> bool:
 def _named(repo: Repo, stem: str) -> str | None:
     """The workflow path for `stem`, accepting the older underscore spelling.
 
-    The pointer files are hyphenated; a repo mid-migration still carries the underscore
+    The caller files are hyphenated; a repo mid-migration still carries the underscore
     names, and a check that only knew one spelling would judge nothing there.
     """
     for name in (stem, stem.replace("-", "_")):
@@ -216,7 +216,7 @@ def _named(repo: Repo, stem: str) -> str | None:
 
 
 def check_canonical_files(repo: Repo) -> Result:
-    """Every pointer and config the stack cannot run without."""
+    """Every caller and config the stack cannot run without."""
     fails, warns = [], []
     fails += [
         f"missing .github/workflows/{w}.yml"
@@ -254,13 +254,13 @@ def check_canonical_files(repo: Repo) -> Result:
     return fails, warns
 
 
-def check_pointers(repo: Repo) -> Result:
-    """Each pointer must call the workflow it stands for, in the repository that owns it.
+def check_callers(repo: Repo) -> Result:
+    """Each caller must call the workflow it stands for, in the repository that owns it.
 
     The pin's shape is check_action_pins' concern, which reads the same line.
     """
     fails = []
-    for name, target in POINTERS.items():
+    for name, target in CALLERS.items():
         rel = f".github/workflows/{name}"
         if not repo.exists(rel):
             continue  # absence is check_canonical_files' verdict, reported once
@@ -276,7 +276,7 @@ def check_pointers(repo: Repo) -> Result:
             if not uses:
                 fails.append(
                     f"{name} job '{jid}' carries a workflow body instead of calling "
-                    f"{target}: it is a copy, not a pointer, so no CI release reaches it"
+                    f"{target}: it is a copy, not a caller, so no CI release reaches it"
                 )
                 continue
             path, _, _sha = uses.rpartition("@")
@@ -338,7 +338,7 @@ def check_previous_tag(repo: Repo) -> Result:
         return [], []
     doc = repo.yaml(rel)
     on = doc.get(True) or doc.get("on") or {}
-    if "release" not in on or _is_pointer(doc):
+    if "release" not in on or _is_caller(doc):
         return [], []
     for _, step in repo.steps(repo.root / rel):
         run = str(step.get("run", ""))
@@ -364,9 +364,9 @@ def check_zip_release_patches_manifest(repo: Repo) -> Result:
         return [], []
     if not re.search(r'"zip_release"\s*:\s*true', repo.text("hacs.json")):
         return [], []
-    # A pointer has no body to read; check_pointers holds it to the workflow that does the
+    # A caller has no body to read; check_callers holds it to the workflow that does the
     # patching, and that body is judged where it lives.
-    if _is_pointer(repo.yaml(".github/workflows/release.yml")):
+    if _is_caller(repo.yaml(".github/workflows/release.yml")):
         return [], []
     if "manifest.json" not in repo.text(".github/workflows/release.yml"):
         return [
@@ -447,7 +447,7 @@ def check_label_events(repo: Repo) -> Result:
 def check_release_drafter_wiring(repo: Repo) -> Result:
     """A drafter body must run the notes generator, its checker, and clone deep enough."""
     rel = _named(repo, "release-drafter")
-    if not rel or _is_pointer(repo.yaml(rel)):
+    if not rel or _is_caller(repo.yaml(rel)):
         return [], []
     t = repo.text(rel)
     fails = []
@@ -527,13 +527,13 @@ def check_claims_have_tests(repo: Repo) -> Result:
             fails.append(
                 'pyproject.toml missing asyncio_mode = "auto" (async tests never run)'
             )
-        # The pytest step lives in this repository's python-validate.yml; a pointer at it
-        # is the proof the suite runs, and check_pointers holds the pointer to that target.
+        # The pytest step lives in this repository's python-validate.yml; a caller of it
+        # is the proof the suite runs, and check_callers holds the caller to that target.
         # A repo still carrying a body is judged on what that body runs.
         validate = ".github/workflows/python-validate.yml"
-        if "pytest" not in repo.text(validate) and not _is_pointer(repo.yaml(validate)):
+        if "pytest" not in repo.text(validate) and not _is_caller(repo.yaml(validate)):
             fails.append(
-                "python-validate.yml has no pytest step and is not a pointer at one "
+                "python-validate.yml has no pytest step and is not a caller of one "
                 "(quality_scale 'done' rules would go unproven)"
             )
     elif done:
@@ -590,7 +590,7 @@ def check_pr_checks_shape(repo: Repo) -> Result:
             "pr-checks.yml must use pull_request_target (fork PRs get a read-only "
             "token otherwise)"
         )
-    if _is_pointer(repo.yaml(rel)):
+    if _is_caller(repo.yaml(rel)):
         return fails, warns  # the jobs live in release-flow and are judged there
     if "Remove superseded" not in t:
         fails.append("pr-checks.yml missing the removal-only superseded-label step")
@@ -729,8 +729,8 @@ def check_pr_openers(repo: Repo) -> Result:
                 "'# skill-audit: sanctioned-opener' with a reason)"
             )
     rel = _named(repo, "auto-draft-pr")
-    # A pointer has no actor gate or --draft to read; that body lives in release-flow.
-    if rel and not _is_pointer(repo.yaml(rel)):
+    # A caller has no actor gate or --draft to read; that body lives in release-flow.
+    if rel and not _is_caller(repo.yaml(rel)):
         opener = repo.text(rel)
         if "github.actor == github.repository_owner" not in opener:
             fails.append(
@@ -1087,7 +1087,7 @@ def check_required_status_checks(repo: Repo) -> Result:
 
 
 def _contexts(doc: dict, source: str) -> dict[str, str]:
-    """Check-run name -> source, pointer jobs recorded as the prefix they produce."""
+    """Check-run name -> source, caller jobs recorded as the prefix they produce."""
     out: dict[str, str] = {}
     for jid, job in (doc.get("jobs") or {}).items():
         job = job or {}
@@ -1097,14 +1097,14 @@ def _contexts(doc: dict, source: str) -> dict[str, str]:
 
 
 def _produced(produced: dict[str, str], context: str) -> bool:
-    """Whether a required context is a produced name, or falls under a pointer's prefix."""
+    """Whether a required context is a produced name, or falls under a caller's prefix."""
     return context in produced or any(
         k.endswith(" / ") and context.startswith(k) for k in produced
     )
 
 
 def _job_names(wf_dir: pathlib.Path) -> dict[str, str]:
-    """Check-run name (or pointer prefix) -> the workflow that defines it."""
+    """Check-run name (or caller prefix) -> the workflow that defines it."""
     out: dict[str, str] = {}
     for wf in sorted(wf_dir.glob("*.y*ml")):
         try:
@@ -1342,7 +1342,7 @@ def check_dependency_graph(repo: Repo) -> Result:
 
 CHECKS = (
     check_canonical_files,
-    check_pointers,
+    check_callers,
     check_no_tracked_artefacts,
     check_single_body_writer,
     check_previous_tag,
