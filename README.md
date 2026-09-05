@@ -66,17 +66,14 @@ A pointer is the original workflow's triggers and permissions around a single jo
 ```yaml
 jobs:
   validate:
-    uses: PineappleEmperor/ha-integration-ci/.github/workflows/python-validate.yml@0000000000000000000000000000000000000000 # v1.0.0
+    uses: PineappleEmperor/ha-integration-ci/.github/workflows/python-validate.yml@ae1131548e7428e9e18dff179269ad29dbaa0bb8 # v1.0.0rc1
 ```
 
 `pointers/release.yml` grants `contents: write` because the called workflow uploads the
 zip to the release; a called workflow can only narrow what its caller grants.
 
-**The all-zeros SHA is a deliberate placeholder.** This repository has no tag yet, so
-there is no commit to pin. At the first tag, replace the SHA in each pointer with the
-commit that tag points at and the comment with the tag; `check_action_pins` accepts the
-placeholder but a workflow run does not, because GitHub refuses a ref that resolves to
-no commit.
+The SHA is the commit a tag of this repository points at and the comment is that tag;
+a pin at a SHA that no tag names is a run GitHub refuses. No pin is ever a placeholder.
 
 GitHub names a check-run from a reusable workflow `<caller job id> / <called job name>`,
 so a consumer's ruleset requires the names in the table, not the bare job names the
@@ -175,10 +172,7 @@ The commit-title, labelling and release-drafting workflows this repository's PRs
 run under (`pr-checks`, `lint-pr`, the draft-PR opener, the release drafter) live in
 [PineappleEmperor/release-flow](https://github.com/PineappleEmperor/release-flow), which
 is generic to any repository using Conventional Commits. Those pointers are not added
-here yet: `release-flow` has no tag, the situation The pointers describes for this
-repository, and a pointer at a placeholder SHA is a workflow that fails on every PR. They
-will be added, pinned to its first tag, once it has one. Until then `ci.yml` is the only
-required check here.
+here yet; until they are, `ci.yml` is the only required check here.
 
 ## Working on this repository
 
