@@ -1,0 +1,42 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+# What these rules mean, and the vocabulary they must stay in step with, is release-flow's README.md.
+# Title rules only; the breaking `!` rule must precede `feature`.
+autolabeler:
+  - label: "xfeat"
+    title:
+      - '/^\w+(\(.+\))?!:/'
+  - label: "chore"
+    title:
+      - '/^(chore|docs|refactor|perf|test|build|ci|style)(\(.+\))?:/i'
+  - label: "fix"
+    title:
+      - '/^fix(\(.+\))?:/i'
+  - label: "feature"
+    title:
+      - '/^(feat|feature)(\(.+\))?:/i'
+# One category per label the autolabeler writes; no aliases, no bump-only labels.
+categories:
+  - title: '🚨 Breaking Changes'
+    semver-increment: major
+    when:
+      labels:
+        - 'xfeat'
+  - title: '🚀 Features'
+    semver-increment: minor
+    when:
+      labels:
+        - 'feature'
+  - title: '🔧 Fixes'
+    semver-increment: patch
+    when:
+      labels:
+        - 'fix'
+  - title: '🧰 Maintenance'
+    semver-increment: patch
+    when:
+      labels:
+        - 'chore'
+# Placeholder until release_notes.py writes the body over it.
+template: |
+  _Release notes were not generated._

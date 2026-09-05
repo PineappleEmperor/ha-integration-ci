@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Enforces the commit rules in release-flow's README.md. Enable once per clone:
+# git config core.hooksPath .githooks
+msg_file="$1"
+subject="$(grep -v '^#' "$msg_file" | sed -n '1p')"
+
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: subject is ${#subject} chars (>72). Keep it terse." >&2
+  exit 1
+fi
+case "$subject" in "Merge "*|"Revert "*|"fixup! "*|"squash! "*) exit 0 ;; esac
+
+# Subject shape.
+if ! printf '%s' "$subject" | grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: [a-z]'; then
+  echo "commit-msg: subject must be '<type>(<scope>)!: <lowercase imperative>'" >&2
+  echo "    types: feat fix docs style refactor perf test build ci chore revert" >&2
+  exit 1
+fi
+case "$subject" in *.) echo "commit-msg: subject must not end in a period." >&2; exit 1 ;; esac
+
+# An `and` after the colon.
+if printf '%s' "$subject" | sed 's/^[^:]*: //' | grep -Eqw 'and'; then
+  echo "commit-msg: one change per commit — this subject joins two with 'and'. Split it." >&2
+  echo "    $subject" >&2
+  exit 1
+fi
+
+# Editorialising words.
+if printf '%s' "$subject" | grep -Eqi '\b(actually|really|properly|simply|just|finally|nobody|somehow|stuff|magic|nice)\b'; then
+  echo "commit-msg: editorialising subject — say what changed, not how you feel about it." >&2
+  echo "    $subject" >&2
+  exit 1
+fi
+
+# AI-attribution trailers; a human Co-Authored-By passes.
+if grep -v '^#' "$msg_file" | grep -Eqi '^Co-authored-by:[[:space:]]*Claude|^Claude-Session:|Generated with .*(Claude|Anthropic)'; then
+  echo "commit-msg: AI-attribution trailer not allowed (strip Co-Authored-By: Claude / Claude-Session)." >&2
+  exit 1
+fi
+
+# Breaking-change footers.
+if grep -v '^#' "$msg_file" | grep -Eqi '^BREAKING[ -]CHANGE:'; then
+  echo "commit-msg: a BREAKING CHANGE footer is read by nothing here. Mark the subject '<type>!:' instead." >&2
+  exit 1
+fi
+
+bad=""
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  case "$line" in \#*) continue ;; esac
+  printf '%s' "$line" | grep -Eq '^[A-Za-z][A-Za-z-]*: ' && continue
+  printf '%s' "$line" | grep -Eq '^(Closes|Refs|Fixes|Resolves) #' && continue
+  bad="$line"
+  break
+done < <(grep -v '^#' "$msg_file" | tail -n +2)
+
+if [ -n "$bad" ]; then
+  echo "commit-msg: narrative body line not allowed:" >&2
+  echo "    $bad" >&2
+  echo "Keep commits subject-only; put detail in the PR / release notes." >&2
+  exit 1
+fi
+exit 0
