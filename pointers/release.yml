@@ -1,0 +1,14 @@
+# Copy to .github/workflows/release.yml in the consuming repository.
+# The all-zeros SHA is a placeholder: README.md, "The pointers".
+name: Create Release ZIP
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: PineappleEmperor/ha-integration-ci/.github/workflows/release.yml@0000000000000000000000000000000000000000 # v1.0.0

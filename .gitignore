@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environments
+.venv/
+venv/
+
+# Repo-local scratch: clones, fixtures and throwaway copies
+.tmp/
+
+# The checkout quality-audit.yml makes beside a consumer's tree; README.md says why.
+.ha-integration-ci/

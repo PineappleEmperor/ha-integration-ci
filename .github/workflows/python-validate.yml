@@ -1,0 +1,50 @@
+name: Python Validate
+# Documented in README.md.
+on:
+  workflow_call:
+
+jobs:
+  lint-and-type:
+    name: Ruff, Pyright and Pytest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            requirements.test.txt
+            pyproject.toml
+
+      - name: Install
+        run: |
+          uv pip install --system homeassistant ruff pyright
+          [ -f requirements.test.txt ] && uv pip install --system -r requirements.test.txt || true
+
+      - name: Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Pyright
+        run: python -m pyright custom_components/
+
+      - name: Pytest
+        run: |
+          if [ ! -d tests ]; then
+            echo "::warning::no tests/ directory - quality_scale rules marked 'done' are unproven"
+          elif [ ! -f requirements.test.txt ]; then
+            echo "::error::tests/ exists but requirements.test.txt is missing"
+            exit 1
+          else
+            pytest tests/ -q
+          fi

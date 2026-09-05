@@ -1,0 +1,15 @@
+# Copy to .github/workflows/python-validate.yml in the consuming repository.
+# The all-zeros SHA is a placeholder: README.md, "The pointers".
+name: Python Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: PineappleEmperor/ha-integration-ci/.github/workflows/python-validate.yml@0000000000000000000000000000000000000000 # v1.0.0
