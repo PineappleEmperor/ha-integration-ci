@@ -546,6 +546,12 @@ def test_matching_platforms_pass(repo) -> None:
     assert audit.check_platforms_have_modules(audit.Repo(repo)) == ([], [])
 
 
+_MATRIX = (
+    "jobs:\n  lint-and-type:\n    strategy:\n      matrix:\n"
+    "        python-version: ['3.14']\n    steps: []\n"
+)
+
+
 def _ruleset(repo, *contexts) -> None:
     (repo / "ruleset.json").write_text(
         json.dumps(
@@ -606,6 +612,45 @@ def test_a_caller_job_never_reports_under_its_bare_id(repo) -> None:
     _ruleset(repo, "validate")
     fails, _ = audit.check_required_contexts_have_producers(audit.Repo(repo))
     assert len(fails) == 1 and "'validate'" in fails[0]
+
+
+def test_a_matrix_job_produces_the_suffixed_context(repo) -> None:
+    """GitHub appends the matrix values, so the suffixed name is the one that reports."""
+    _wf(repo, "python-validate.yml", _MATRIX)
+    _ruleset(repo, "lint-and-type (3.14)")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
+
+
+def test_a_matrix_job_never_reports_under_its_bare_name(repo) -> None:
+    """The other half: the bare job name is a check-run GitHub never creates."""
+    _wf(repo, "python-validate.yml", _MATRIX)
+    _ruleset(repo, "lint-and-type")
+    fails, _ = audit.check_required_contexts_have_producers(audit.Repo(repo))
+    assert len(fails) == 1 and "'lint-and-type'" in fails[0]
+
+
+def test_a_two_dimension_matrix_names_its_values_in_key_order(repo) -> None:
+    """One check-run per combination, values comma-joined in the order the keys are declared."""
+    _wf(
+        repo,
+        "a.yml",
+        "jobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu, macos]\n"
+        "        py: ['3.14']\n    steps: []\n",
+    )
+    _ruleset(repo, "test (macos, 3.14)")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
+
+
+def test_a_matrix_it_cannot_enumerate_accepts_any_combination(repo) -> None:
+    """`include` adds combinations no product predicts, and guessing would fail a live gate."""
+    _wf(
+        repo,
+        "a.yml",
+        "jobs:\n  test:\n    strategy:\n      matrix:\n        py: ['3.14']\n"
+        "        include:\n          - py: '3.15'\n    steps: []\n",
+    )
+    _ruleset(repo, "test (3.15)")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
 
 
 def test_live_required_contexts_warn_when_gh_is_missing(repo, monkeypatch) -> None:
