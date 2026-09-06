@@ -208,6 +208,12 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   update bumps the SHA and the version comment together, so a CI release arrives at every
   integration as the same PR it already receives for its other actions, and goes green
   with no hand edit. Nothing is copied in that PR.
+- **A release is held for three days before it is offered.** Dependabot resolves the pinned
+  SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
+  (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
+  default is invisible under a weekly schedule and is the whole delay under a daily one, so
+  a consumer that wants a release the day it lands sets `cooldown: {default-days: 0}` in its
+  `dependabot.yml`. Read from the testbed's own update job after `v1.0.1` of release-flow.
 - **The scripts ride the same pin.** `quality-audit.yml` checks this repository out at
   `github.job_workflow_sha`, the commit of the reusable workflow that is running, so a
   consumer can never run one release's workflow with another release's audit.
