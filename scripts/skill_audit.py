@@ -884,7 +884,7 @@ def check_autolabeler_title_only(repo: Repo) -> Result:
 
 
 def check_drafter_categories(repo: Repo) -> Result:
-    """v7 matches under `when:`; the v6 shape parses and matches nothing."""
+    """The pre-`when:` `labels:` is deprecated in v7 and removed in a later release."""
     if not repo.exists(".github/release-drafter.yml"):
         return [], []
     cfg = repo.yaml(".github/release-drafter.yml")
@@ -896,8 +896,9 @@ def check_drafter_categories(repo: Repo) -> Result:
     if bad:
         return [
             (
-                f"release-drafter categories use the v6 top-level `labels:`; v7 matches under "
-                f"`when:` and these never match, so the version resolves to a patch bump: {bad}"
+                f"release-drafter categories use the deprecated top-level `labels:`; v7.7.0 "
+                f"still matches on it and warns, and it is removed in a later release — move "
+                f"them under `when:`: {bad}"
             )
         ], []
     return [], []

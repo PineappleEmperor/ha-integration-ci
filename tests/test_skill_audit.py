@@ -239,13 +239,16 @@ def test_a_zip_release_body_that_never_patches_the_manifest_fails(repo) -> None:
     assert len(fails) == 1 and "manifest" in fails[0]
 
 
-def test_v6_drafter_categories_fail(repo) -> None:
-    """The v6 shape parses, matches nothing, and resolves every release as a patch."""
+def test_deprecated_drafter_categories_fail(repo) -> None:
+    """The pre-`when:` shape still matches in v7.7.0; it warns, and it goes in a later release."""
     (repo / ".github/release-drafter.yml").write_text(
         "categories:\n  - title: Features\n    semver-increment: minor\n    labels:\n      - feature\n"
     )
     fails, _ = audit.check_drafter_categories(audit.Repo(repo))
-    assert len(fails) == 1 and "v6 top-level" in fails[0]
+    assert len(fails) == 1 and "deprecated" in fails[0]
+    assert "patch bump" not in fails[0], (
+        "it still matches; the field is only deprecated"
+    )
 
 
 def test_when_shaped_categories_pass(repo) -> None:
