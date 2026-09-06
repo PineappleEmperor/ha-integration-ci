@@ -1091,11 +1091,11 @@ def check_required_status_checks(repo: Repo) -> Result:
 def _matrix_names(name: str, job: dict) -> list[str]:
     """The check-run names GitHub creates for one job: its name, or one per combination.
 
-    A matrix job is never reported under its bare name — GitHub appends the combination,
-    `lint-and-type (3.14)` — so a ruleset naming the job alone waits forever and one naming
-    a combination is right. `include` and `exclude` add and drop combinations a product
-    cannot predict, so those yield the `<name> (` prefix instead: accepting any combination
-    is the honest answer, where inventing the wrong ones would fail a live gate.
+    Why a matrix renames the check-run is README.md, under Implementation notes; a ruleset
+    naming the job alone therefore waits forever. `include` and `exclude` add and drop
+    combinations a product cannot predict, so those yield the `<name> (` prefix instead:
+    accepting any combination is the honest answer, where inventing the wrong ones would
+    fail a live gate.
     """
     strategy = job.get("strategy") or {}
     if "matrix" not in strategy:
