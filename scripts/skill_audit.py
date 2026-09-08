@@ -12,6 +12,7 @@ README.md says what it checks and what it no longer does.
 
 import argparse
 import ast
+import itertools
 import json
 import os
 import pathlib
@@ -883,7 +884,7 @@ def check_autolabeler_title_only(repo: Repo) -> Result:
 
 
 def check_drafter_categories(repo: Repo) -> Result:
-    """v7 matches under `when:`; the v6 shape parses and matches nothing."""
+    """The pre-`when:` `labels:` is deprecated in v7 and removed in a later release."""
     if not repo.exists(".github/release-drafter.yml"):
         return [], []
     cfg = repo.yaml(".github/release-drafter.yml")
@@ -895,8 +896,9 @@ def check_drafter_categories(repo: Repo) -> Result:
     if bad:
         return [
             (
-                f"release-drafter categories use the v6 top-level `labels:`; v7 matches under "
-                f"`when:` and these never match, so the version resolves to a patch bump: {bad}"
+                f"release-drafter categories use the deprecated top-level `labels:`; v7.7.0 "
+                f"still matches on it and warns, and it is removed in a later release — move "
+                f"them under `when:`: {bad}"
             )
         ], []
     return [], []
@@ -1086,20 +1088,57 @@ def check_required_status_checks(repo: Repo) -> Result:
     return fails, warns
 
 
+def _matrix_names(name: str, job: dict) -> list[str]:
+    """The check-run names GitHub creates for one job: its name, or one per combination.
+
+    Why a matrix renames the check-run is README.md, under Implementation notes; a ruleset
+    naming the job alone therefore waits forever. `include` and `exclude` add and drop
+    combinations a product cannot predict, so those yield the `<name> (` prefix instead:
+    accepting any combination is the honest answer, where inventing the wrong ones would
+    fail a live gate.
+    """
+    strategy = job.get("strategy") or {}
+    if "matrix" not in strategy:
+        return [name]
+    matrix = strategy.get("matrix")
+    keys = (
+        [k for k in matrix if k not in ("include", "exclude")]
+        if isinstance(matrix, dict)
+        else []
+    )
+    values = [matrix[k] for k in keys]
+    if (
+        not keys
+        or "include" in matrix
+        or "exclude" in matrix
+        or not all(isinstance(v, list) and v for v in values)
+        or not all(isinstance(x, (str, int, float, bool)) for v in values for x in v)
+    ):
+        return [f"{name} ("]
+    return [
+        f"{name} ({', '.join(str(x) for x in combo)})"
+        for combo in itertools.product(*values)
+    ]
+
+
 def _contexts(doc: dict, source: str) -> dict[str, str]:
-    """Check-run name -> source, caller jobs recorded as the prefix they produce."""
+    """Check-run name -> source, jobs that produce a family recorded as its prefix."""
     out: dict[str, str] = {}
     for jid, job in (doc.get("jobs") or {}).items():
         job = job or {}
         name = str(job.get("name") or jid)
-        out[f"{name} / " if "uses" in job else name] = source
+        if "uses" in job:
+            out[f"{name} / "] = source
+            continue
+        for produced in _matrix_names(name, job):
+            out[produced] = source
     return out
 
 
 def _produced(produced: dict[str, str], context: str) -> bool:
-    """Whether a required context is a produced name, or falls under a caller's prefix."""
+    """Whether a required context is a produced name, or falls under a produced prefix."""
     return context in produced or any(
-        k.endswith(" / ") and context.startswith(k) for k in produced
+        k.endswith((" / ", " (")) and context.startswith(k) for k in produced
     )
 
 
