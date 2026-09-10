@@ -229,6 +229,9 @@ any other: its `.github/workflows/` carries release-flow's four callers, its
 `.github/release-drafter.yml` and `.githooks/commit-msg` are the copies that README
 lists, and `RELEASE_TOKEN` is set. `ci.yml` is its own.
 
+It carries a fifth caller an integration does not, `testbed-coverage.yml`, described
+under The five workflows in that README and given complete under Calling the workflows.
+
 ## Working on this repository
 
 ```
