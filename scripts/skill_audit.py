@@ -62,60 +62,77 @@ CALLERS = {
     ),
 }
 PIN_EXEMPT = ("hacs/action", "home-assistant/actions")
-CANON_RULES = {
-    "action-setup",
-    "appropriate-polling",
-    "brands",
-    "common-modules",
-    "config-flow-test-coverage",
-    "config-flow",
-    "dependency-transparency",
-    "docs-actions",
-    "docs-high-level-description",
-    "docs-installation-instructions",
-    "docs-removal-instructions",
-    "entity-event-setup",
-    "entity-unique-id",
-    "has-entity-name",
-    "runtime-data",
-    "test-before-configure",
-    "test-before-setup",
-    "unique-config-entry",
-    "config-entry-unloading",
-    "log-when-unavailable",
-    "entity-unavailable",
-    "action-exceptions",
-    "reauthentication-flow",
-    "parallel-updates",
-    "test-coverage",
-    "integration-owner",
-    "docs-installation-parameters",
-    "docs-configuration-parameters",
-    "entity-translations",
-    "entity-device-class",
-    "devices",
-    "entity-category",
-    "entity-disabled-by-default",
-    "discovery",
-    "stale-devices",
-    "diagnostics",
-    "exception-translations",
-    "icon-translations",
-    "reconfiguration-flow",
-    "dynamic-devices",
-    "discovery-update-info",
-    "repair-issues",
-    "docs-use-cases",
-    "docs-supported-devices",
-    "docs-supported-functions",
-    "docs-data-update",
-    "docs-known-limitations",
-    "docs-troubleshooting",
-    "docs-examples",
-    "async-dependency",
-    "inject-websession",
-    "strict-typing",
+# Tier membership as hassfest's ALL_RULES in core's script/hassfest/quality_scale.py has
+# it. Why a custom integration's file is judged here and not by hassfest is the skill's
+# reference/quality-scale.md; when to re-derive this table is its reference/freshness.md.
+TIERS = ("bronze", "silver", "gold", "platinum")
+TIER_RULES = {
+    "bronze": frozenset(
+        {
+            "action-setup",
+            "appropriate-polling",
+            "brands",
+            "common-modules",
+            "config-flow",
+            "config-flow-test-coverage",
+            "dependency-transparency",
+            "docs-actions",
+            "docs-conditions",
+            "docs-high-level-description",
+            "docs-installation-instructions",
+            "docs-removal-instructions",
+            "docs-triggers",
+            "entity-event-setup",
+            "entity-unique-id",
+            "has-entity-name",
+            "runtime-data",
+            "test-before-configure",
+            "test-before-setup",
+            "unique-config-entry",
+        }
+    ),
+    "silver": frozenset(
+        {
+            "action-exceptions",
+            "config-entry-unloading",
+            "docs-configuration-parameters",
+            "docs-installation-parameters",
+            "entity-unavailable",
+            "integration-owner",
+            "log-when-unavailable",
+            "parallel-updates",
+            "reauthentication-flow",
+            "test-coverage",
+        }
+    ),
+    "gold": frozenset(
+        {
+            "devices",
+            "diagnostics",
+            "discovery",
+            "discovery-update-info",
+            "docs-data-update",
+            "docs-examples",
+            "docs-known-limitations",
+            "docs-supported-devices",
+            "docs-supported-functions",
+            "docs-troubleshooting",
+            "docs-use-cases",
+            "dynamic-devices",
+            "entity-category",
+            "entity-device-class",
+            "entity-disabled-by-default",
+            "entity-translations",
+            "exception-translations",
+            "icon-translations",
+            "reconfiguration-flow",
+            "repair-issues",
+            "stale-devices",
+        }
+    ),
+    "platinum": frozenset({"async-dependency", "inject-websession", "strict-typing"}),
 }
+CANON_RULES = frozenset().union(*TIER_RULES.values())
 ANTIPATTERNS = (
     (
         r"discovery\.async_load_platform",
@@ -480,10 +497,12 @@ def check_classifier_not_inlined(repo: Repo) -> Result:
 
 
 def _quality_scale(repo: Repo) -> dict:
+    """The `rules:` mapping, or empty when absent or not a mapping."""
     if not repo.cc:
         return {}
     rel = str((repo.cc / "quality_scale.yaml").relative_to(repo.root))
-    return (repo.yaml(rel) or {}).get("rules") or {}
+    rules = (repo.yaml(rel) or {}).get("rules")
+    return rules if isinstance(rules, dict) else {}
 
 
 def _status(value) -> str | None:
@@ -824,6 +843,21 @@ def check_quality_scale_and_manifest(repo: Repo) -> Result:
         fails.append("missing quality_scale.yaml")
     manifest = repo.cc / "manifest.json"
     m = manifest.read_text(errors="replace") if manifest.is_file() else ""
+    # The tier walk core's own gate does; why it is ours to do is above TIER_RULES.
+    try:
+        doc = json.loads(m)
+    except ValueError:
+        doc = {}
+    claimed = str(doc.get("quality_scale", "")) if isinstance(doc, dict) else ""
+    if claimed in TIERS:
+        rules = _quality_scale(repo)
+        met = {n for n, v in rules.items() if _status(v) in ("done", "exempt")}
+        fails.extend(
+            f"manifest claims quality_scale {claimed!r} but {tier} rule(s) are "
+            f"neither done nor exempt: {unmet[:6]}"
+            for tier in TIERS[: TIERS.index(claimed) + 1]
+            if (unmet := sorted(TIER_RULES[tier] - met))
+        )
     if '"integration_type"' not in m:
         fails.append("manifest.json missing integration_type")
     if '"issue_tracker"' not in m:
