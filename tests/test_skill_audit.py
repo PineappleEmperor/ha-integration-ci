@@ -1135,3 +1135,75 @@ def test_a_default_branch_with_no_required_checks_fails(repo, monkeypatch) -> No
     fails, warns = audit.check_required_status_checks(audit.Repo(repo))
     assert len(fails) == 1 and "no required status checks on main" in fails[0]
     assert warns == []
+
+
+def test_the_canonical_rule_set_is_core_s_fifty_four() -> None:
+    """The list went two rules stale unnoticed; hassfest reads no custom file, so this is the gate."""
+    assert {"docs-conditions", "docs-triggers"} <= audit.CANON_RULES
+    assert len(audit.CANON_RULES) == 54
+    assert frozenset().union(*audit.TIER_RULES.values()) == audit.CANON_RULES
+    assert [len(audit.TIER_RULES[t]) for t in audit.TIERS] == [20, 10, 21, 3]
+
+
+def _ledger(**overrides: str) -> str:
+    """Every canonical rule done, with the named ones overridden."""
+    rules = dict.fromkeys(sorted(audit.CANON_RULES), "done") | overrides
+    return "rules:\n" + "".join(f"  {k}: {v}\n" for k, v in rules.items())
+
+
+def test_a_claimed_tier_with_a_rule_still_todo_fails(repo) -> None:
+    """Core's gate walks the claimed tier; for a custom integration nothing else does."""
+    pkg = _integration(repo, **{"quality_scale.yaml": _ledger(brands="todo")})
+    (pkg / "manifest.json").write_text(
+        '{"domain": "acmedev", "quality_scale": "bronze"}'
+    )
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    tier = [f for f in fails if "claims" in f]
+    assert len(tier) == 1 and "bronze" in tier[0] and "brands" in tier[0]
+
+
+def test_a_rule_above_the_claimed_tier_may_stay_todo(repo) -> None:
+    """A bronze claim is judged on bronze rules; gold work left `todo` is honest."""
+    pkg = _integration(repo, **{"quality_scale.yaml": _ledger(diagnostics="todo")})
+    (pkg / "manifest.json").write_text(
+        '{"domain": "acmedev", "quality_scale": "bronze"}'
+    )
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("claims" in f for f in fails)
+
+
+def test_an_exempt_rule_meets_the_claimed_tier(repo) -> None:
+    """`exempt` with a comment is the honest alternative and satisfies the tier."""
+    pkg = _integration(
+        repo,
+        **{
+            "quality_scale.yaml": _ledger(
+                brands="\n    status: exempt\n    comment: no device"
+            )
+        },
+    )
+    (pkg / "manifest.json").write_text(
+        '{"domain": "acmedev", "quality_scale": "platinum"}'
+    )
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("claims" in f for f in fails)
+
+
+def test_a_manifest_that_is_not_an_object_is_reported_not_crashed(repo) -> None:
+    """A manifest parsing to a list must fail its checks, not traceback the audit."""
+    pkg = _integration(repo, **{"quality_scale.yaml": _ledger()})
+    (pkg / "manifest.json").write_text("[]")
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("claims" in f for f in fails)
+    assert any("integration_type" in f for f in fails)
+
+
+def test_a_rules_list_instead_of_a_mapping_is_reported_not_crashed(repo) -> None:
+    """`rules:` written as a list lists nothing, and a claim on it meets nothing."""
+    pkg = _integration(repo, **{"quality_scale.yaml": "rules:\n  - brands\n"})
+    (pkg / "manifest.json").write_text(
+        '{"domain": "acmedev", "quality_scale": "bronze"}'
+    )
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert any("canonical rule set" in f for f in fails)
+    assert any("claims" in f and "bronze" in f for f in fails)

@@ -157,7 +157,9 @@ of it, not a substitute.
   a caller, because the triggers are the caller's own.
 - **The integration itself.** `PLATFORMS` names with no module beside them, deprecated
   APIs, bare `# type: ignore`, multi-line docstrings on functions and classes, the
-  canonical `quality_scale.yaml` rule set, manifest honesty (`integration_type`,
+  canonical `quality_scale.yaml` rule set and — since hassfest walks a claimed tier for
+  core integrations only — every rule at or below the manifest's `quality_scale` marked
+  `done` or `exempt`, manifest honesty (`integration_type`,
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no test
   behind it, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness,
   brand assets at the sizes HACS expects.
