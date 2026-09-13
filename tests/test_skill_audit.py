@@ -1075,6 +1075,12 @@ def test_an_opener_with_no_token_fails(repo, monkeypatch) -> None:
     monkeypatch.setattr(
         audit.subprocess, "run", _fake_gh({"secret": "APP_ID\nAPP_PRIVATE_KEY\n"})
     )
+    fails, _ = audit.check_release_token(audit.Repo(repo))
+    assert len(fails) == 1 and "RELEASE_TOKEN" in fails[0]
+
+    monkeypatch.setattr(
+        audit.subprocess, "run", _fake_gh({"secret": "RELEASE_TOKEN\n"})
+    )
     assert audit.check_release_token(audit.Repo(repo)) == ([], [])
 
 
