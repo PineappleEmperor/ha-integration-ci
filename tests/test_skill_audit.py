@@ -974,7 +974,7 @@ def _fake_gh(answers: dict[str, str]):
 
 
 def test_a_tracked_compiled_artefact_fails(tmp_path) -> None:
-    """A committed .pyc ships inside every release zip."""
+    """A committed .pyc is per-interpreter bytes that churn every diff."""
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
     subprocess.run([*git, "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
     (tmp_path / "x.pyc").write_bytes(b"\x00")

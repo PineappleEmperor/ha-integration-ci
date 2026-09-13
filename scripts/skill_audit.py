@@ -306,7 +306,7 @@ def check_callers(repo: Repo) -> Result:
 
 
 def check_no_tracked_artefacts(repo: Repo) -> Result:
-    """A committed .pyc ships inside every release zip."""
+    """A committed .pyc is per-interpreter bytes that churn every diff."""
     try:
         out = subprocess.run(
             ["git", "ls-files"],
