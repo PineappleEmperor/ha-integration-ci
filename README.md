@@ -10,7 +10,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
 | `.github/workflows/python-validate.yml` | `Ruff, Pyright and Pytest` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, pyright on `custom_components/`, pytest on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
-| `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release for HACS. The domain comes from the manifest. |
+| `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
 Every one of them is `on: workflow_call:` only. None declares a `secrets:` block: the caller's `GITHUB_TOKEN`
@@ -34,9 +34,9 @@ step runs against the consumer's own checkout.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
-  `GH_TOKEN` lets three checks query GitHub — required contexts, the live ruleset and the
-  dependency graph — instead of reporting NOT CHECKED; a required context with no
-  producing job once blocked a PR here while CI stayed green.
+  `GH_TOKEN` lets the checks that ask GitHub answer instead of downgrading, as What the
+  audit checks now says they do without it; a required context with no producing job
+  once blocked a PR here while CI stayed green.
 - **release.yml** patches the manifest because HACS installs the asset built here, so the
   manifest inside the zip is what users get; `frenck/spook` patches the same way, from the
   same event, and the committed manifest value is a placeholder between releases —
@@ -146,29 +146,44 @@ of it, not a substitute.
   `ha-panel-ci` for `panel-bundle`) and to carry no body; a file whose only trigger is
   `workflow_call` is a body in the repository that owns it, not a copy, and is skipped.
   `check_action_pins` holds every `uses:` line, caller or step, to a 40-hex SHA with a
-  version comment, so a `{{sha}}` copied unresolved from a README fails. `dependency-review`, HACS and hassfest are settings over a third-party
-  action and stay plain files; nothing of theirs is versioned by a repository of ours.
+  version comment, so a `{{sha}}` copied unresolved from a README fails; exempt are
+  local `./` actions, which carry no ref, and `hacs/action` and
+  `home-assistant/actions`, each of which documents a mutable ref. `dependency-review`,
+  HACS and hassfest are plain files, not callers.
 - **Whatever workflow bodies the consumer still carries.** No `<placeholder>` in a `run:`,
   `with:` or `env:` value; no `${{ }}` inside a `run:`; a `setup-python` step before any
   step that runs Python, per job; one writer of the release body; `pull_request_target`
-  on `pr-checks.yml`; no second labeler; no unsanctioned `gh pr create`. A check that
+  on `pr-checks.yml`; no second labeler; no `gh pr create` outside release-flow's draft
+  opener, unless the workflow carries a `# skill-audit: sanctioned-opener` line (the
+  check reads the marker; the reason it asks for beside it is for the reader). A check that
   reads a body skips a caller, because the body it would read lives in the repository
   the caller names and is judged there; the checks that read triggers still apply to
   a caller, because the triggers are the caller's own.
 - **The integration itself.** `PLATFORMS` names with no module beside them, deprecated
-  APIs, bare `# type: ignore`, multi-line docstrings on functions and classes, the
+  APIs, bare `# type: ignore`, multi-line docstrings on functions and classes under
+  `custom_components/` (module docstrings are exempt, a missing docstring is not checked,
+  and a consumer's own `scripts/` and `tests/` are not read), a tracked compiled artefact
+  (a `.py[cod]` file or a `__pycache__`, per-interpreter bytes that churn every diff), the
   canonical `quality_scale.yaml` rule set and — since hassfest walks a claimed tier for
   core integrations only — every rule at or below the manifest's `quality_scale` marked
   `done` or `exempt`, manifest honesty (`integration_type`,
-  `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no test
-  behind it, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness,
-  brand assets at the sizes HACS expects.
+  `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
+  behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
+  `*.spec.ts`, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness (a
+  warning when unpinned), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
+  depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
+  warning), brand assets at the sizes HACS expects.
 - **The drafter config, the ruleset and the GitHub side.** Title-only autolabeler rules,
   v7 `when:`-shaped categories, every required context in `ruleset.json` and in the live
   branch rules produced by some job (on the base branch or in the working tree, and the
   verdict says which), required status checks present at all, the dependency graph on
-  when `dependency-review.yml` is carried, `RELEASE_TOKEN` or the App pair present when
-  the draft-PR opener is.
+  when `dependency-review.yml` is carried, `RELEASE_TOKEN` present when the draft-PR
+  opener is — the one secret *The one secret* in release-flow's README describes, and
+  nothing in its place. Without `gh`, or with a token that cannot answer, the required
+  status checks, the live ruleset and the secret downgrade to a warning rather than a
+  failure and the audit still exits green, so a clean run without `gh` is not evidence
+  of the GitHub side. The dependency graph is the one exception, and only when `gh`
+  answers: a probe that cannot read the graph is the failure the check exists to catch.
 - **The commit hook.** Present, executable, enforcing the Conventional Commit subject
   shape and rejecting editorialising subjects, and `core.hooksPath` pointing at it.
 
@@ -220,8 +235,8 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   `github.job_workflow_sha`, the commit of the reusable workflow that is running, so a
   consumer can never run one release's workflow with another release's audit.
 - **No repo runs integration workflows on itself.** This repository's own CI is Working
-  on this repository, below. A release of the reusable workflows is proven on the testbed
-  integration before it is tagged.
+  on this repository, below. The testbed rule and the check that enforces it are
+  `testbed-coverage.yml` under *The five workflows* in release-flow's README.
 
 ## This repository's own PR gate
 
