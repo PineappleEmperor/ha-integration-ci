@@ -6,6 +6,8 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore
+    cooldown:
+      exclude: ["PineappleEmperor/*"]
     groups:
       actions:
         patterns: ["*"]
