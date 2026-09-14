@@ -14,7 +14,7 @@ autolabeler:
       - '/^fix(\(.+\))?:/i'
   - label: "feature"
     title:
-      - '/^(feat|feature)(\(.+\))?:/i'
+      - '/^feat(\(.+\))?:/i'
 # One category per label the autolabeler writes; no aliases, no bump-only labels.
 categories:
   - title: '🚨 Breaking Changes'
