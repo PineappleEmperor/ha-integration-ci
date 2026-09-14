@@ -306,7 +306,7 @@ def check_callers(repo: Repo) -> Result:
 
 
 def check_no_tracked_artefacts(repo: Repo) -> Result:
-    """A committed .pyc ships inside every release zip."""
+    """A committed .pyc is per-interpreter bytes that churn every diff."""
     try:
         out = subprocess.run(
             ["git", "ls-files"],
@@ -1052,14 +1052,12 @@ def check_release_token(repo: Repo) -> Result:
         return [], [
             "cannot list secrets here — verify RELEASE_TOKEN exists, or draft PRs will not open"
         ]
-    names = set(out.stdout.split())
-    # Either sanctioned source: the PAT, or the GitHub App pair the App path mints from.
-    if "RELEASE_TOKEN" in names or {"APP_ID", "APP_PRIVATE_KEY"} <= names:
+    if "RELEASE_TOKEN" in out.stdout.split():
         return [], []
     return [
         (
-            "the draft-PR opener is present but neither RELEASE_TOKEN nor the "
-            "APP_ID/APP_PRIVATE_KEY pair is set (see SKILL.md, RELEASE_TOKEN)"
+            "the draft-PR opener is present but RELEASE_TOKEN is not set; the opener "
+            "reads that one secret and mints nothing, so no draft PR will open"
         )
     ], []
 

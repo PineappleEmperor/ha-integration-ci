@@ -974,7 +974,7 @@ def _fake_gh(answers: dict[str, str]):
 
 
 def test_a_tracked_compiled_artefact_fails(tmp_path) -> None:
-    """A committed .pyc ships inside every release zip."""
+    """A committed .pyc is per-interpreter bytes that churn every diff."""
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
     subprocess.run([*git, "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
     (tmp_path / "x.pyc").write_bytes(b"\x00")
@@ -1074,6 +1074,12 @@ def test_an_opener_with_no_token_fails(repo, monkeypatch) -> None:
 
     monkeypatch.setattr(
         audit.subprocess, "run", _fake_gh({"secret": "APP_ID\nAPP_PRIVATE_KEY\n"})
+    )
+    fails, _ = audit.check_release_token(audit.Repo(repo))
+    assert len(fails) == 1 and "RELEASE_TOKEN" in fails[0]
+
+    monkeypatch.setattr(
+        audit.subprocess, "run", _fake_gh({"secret": "RELEASE_TOKEN\n"})
     )
     assert audit.check_release_token(audit.Repo(repo)) == ([], [])
 
