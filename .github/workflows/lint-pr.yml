@@ -10,4 +10,4 @@ jobs:
   lint:
     permissions:
       pull-requests: read
-    uses: PineappleEmperor/release-flow/.github/workflows/lint-pr.yml@89111bc9dc1fdf414354ac227180303a5c3963c2 # v1.1.0
+    uses: PineappleEmperor/release-flow/.github/workflows/lint-pr.yml@87305e56bf921fe8728a2b448b112b06da6cc082 # v1.1.1
