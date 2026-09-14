@@ -231,8 +231,10 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   default applies with no `cooldown` key at all, is invisible under a weekly schedule and is
   the whole delay under a daily one. Read from the testbed's own update job after `v1.0.1`
   of release-flow. `default-days` cannot remove it, since GitHub documents cooldown days as
-  1 to 90; `cooldown: {exclude: ["*"]}` on an ecosystem does, because the updater treats
-  an excluded dependency as never in cooldown.
+  1 to 90. `cooldown: {exclude: ["PineappleEmperor/*"]}` on the `github-actions` ecosystem
+  does, for this stack's reusable workflows only, because the updater treats an excluded
+  dependency as never in cooldown; third-party actions and packages keep the hold, which
+  GitHub added against malicious releases, and security updates skip it regardless.
 - **The scripts ride the same pin.** `quality-audit.yml` checks this repository out at
   `github.job_workflow_sha`, the commit of the reusable workflow that is running, so a
   consumer can never run one release's workflow with another release's audit.
