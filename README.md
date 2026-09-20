@@ -172,7 +172,9 @@ of it, not a substitute.
   `*.spec.ts`, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness (a
   warning when unpinned), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
   depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
-  warning), brand assets at the sizes HACS expects.
+  warning), and `brand/icon.png`, the one brand file HACS gates a listing on — every other
+  brand rule is quality and warns, a logo included, since the brands README says to ship
+  only the icons where the two would be the same image.
 - **The drafter config, the ruleset and the GitHub side.** Title-only autolabeler rules,
   v7 `when:`-shaped categories, every required context in `ruleset.json` and in the live
   branch rules produced by some job (on the base branch or in the working tree, and the
