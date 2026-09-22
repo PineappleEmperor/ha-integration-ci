@@ -1050,19 +1050,45 @@ def _png(width: int, height: int) -> bytes:
     )
 
 
-def test_missing_and_mis_sized_brand_assets_fail(repo) -> None:
-    """A present icon.png with no @2x is the 'icon shows only sometimes' bug."""
+def test_a_brand_folder_without_an_icon_fails(repo) -> None:
+    """icon.png is the one brand file HACS gates on; nothing else blocks a listing."""
     _integration(repo)
-    fails, _ = audit.check_brand_assets(audit.Repo(repo))
-    assert len(fails) == 1 and "brand/" in fails[0]
+    fails, warns = audit.check_brand_assets(audit.Repo(repo))
+    assert len(fails) == 1 and "brand/icon.png" in fails[0]
+    assert not warns
 
+    (repo / "custom_components/acmedev/brand").mkdir()
+    fails, _ = audit.check_brand_assets(audit.Repo(repo))
+    assert len(fails) == 1 and "brand/icon.png" in fails[0]
+
+
+def test_brand_sizes_warn_and_an_absent_logo_says_nothing(repo) -> None:
+    """Off-spec sizes degrade rendering; a logo is optional, since icon.png serves it."""
+    _integration(repo)
     brand = repo / "custom_components/acmedev/brand"
     brand.mkdir()
     (brand / "icon.png").write_bytes(_png(384, 384))
-    fails, _ = audit.check_brand_assets(audit.Repo(repo))
-    assert len(fails) == 1
-    assert "icon.png is (384, 384)" in fails[0] and "missing" in fails[0]
-    assert "icon@2x.png" in fails[0] and "logo@2x.png" in fails[0]
+    fails, warns = audit.check_brand_assets(audit.Repo(repo))
+    assert not fails
+    joined = " ".join(warns)
+    assert "icon.png is (384, 384)" in joined and "icon@2x.png" in joined
+    assert "logo" not in joined
+
+
+def test_a_logo_outside_its_band_warns_and_a_good_set_is_silent(repo) -> None:
+    """The spec bands a logo's shortest side; a square logo inside the band is legitimate."""
+    _integration(repo)
+    brand = repo / "custom_components/acmedev/brand"
+    brand.mkdir()
+    (brand / "icon.png").write_bytes(_png(256, 256))
+    (brand / "icon@2x.png").write_bytes(_png(512, 512))
+    (brand / "logo.png").write_bytes(_png(400, 64))
+    fails, warns = audit.check_brand_assets(audit.Repo(repo))
+    assert not fails
+    assert len(warns) == 1 and "logo.png" in warns[0] and "64" in warns[0]
+
+    (brand / "logo.png").write_bytes(_png(400, 200))
+    assert audit.check_brand_assets(audit.Repo(repo)) == ([], [])
 
 
 def test_an_opener_with_no_token_fails(repo, monkeypatch) -> None:

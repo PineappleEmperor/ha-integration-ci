@@ -1002,34 +1002,52 @@ def check_commit_hook(repo: Repo) -> Result:
 
 
 def check_brand_assets(repo: Repo) -> Result:
-    """A present icon.png with no @2x is the classic 'icon shows only sometimes' bug."""
+    """icon.png is the one brand file HACS gates on; every other rule is quality.
+
+    HACS check-brands asks for a brand directory holding at least an icon.png, falling
+    back to the domain's folder in home-assistant/brands, and that is the only brand
+    condition anything refuses a repository over. The rest — the exact icon sizes, the
+    hDPI variants, a logo's shortest-side band — degrade how the mark renders and are
+    reported as warnings. A logo is not required at all: the brands README says to ship
+    only the icons where the two would be the same image, and the serving layer answers
+    an absent logo.png with icon.png.
+    """
     if not repo.cc:
         return [], []
     brand = repo.cc / "brand"
-    if not brand.is_dir():
+    icon = brand / "icon.png"
+    if not icon.is_file():
         return [
-            f"missing {brand.relative_to(repo.root)}/ (HACS check-brands fails without icon.png)"
+            f"missing {icon.relative_to(repo.root)} — HACS check-brands fails unless "
+            "the domain is listed in home-assistant/brands"
         ], []
 
-    def size(p: pathlib.Path):
+    def size(p: pathlib.Path) -> tuple[int, int] | None:
         b = p.read_bytes()
         return struct.unpack(">II", b[16:24]) if b[:8] == b"\x89PNG\r\n\x1a\n" else None
 
-    bad = []
+    warnings = []
     for name, expected in (("icon.png", (256, 256)), ("icon@2x.png", (512, 512))):
         f = brand / name
         if not f.is_file():
-            bad.append(f"missing {f.relative_to(repo.root)}")
+            warnings.append(f"missing {f.relative_to(repo.root)}")
         elif size(f) != expected:
-            bad.append(f"{f.relative_to(repo.root)} is {size(f)}, expected {expected}")
-    bad += [
-        f"missing {(brand / n).relative_to(repo.root)}"
-        for n in ("logo.png", "logo@2x.png")
-        if not (brand / n).is_file()
-    ]
-    return (
-        [f"brand assets missing or wrongly sized: {'; '.join(bad)}"] if bad else []
-    ), []
+            warnings.append(
+                f"{f.relative_to(repo.root)} is {size(f)}, expected {expected}"
+            )
+    for name, low, high in (("logo.png", 128, 256), ("logo@2x.png", 256, 512)):
+        f = brand / name
+        if not f.is_file():
+            continue
+        dims = size(f)
+        if dims is None:
+            warnings.append(f"{f.relative_to(repo.root)} is not a PNG")
+        elif not low <= min(dims) <= high:
+            warnings.append(
+                f"{f.relative_to(repo.root)} shortest side is {min(dims)}, "
+                f"expected {low}-{high}"
+            )
+    return [], warnings
 
 
 def check_release_token(repo: Repo) -> Result:
