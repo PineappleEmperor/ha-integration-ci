@@ -23,7 +23,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: pyproject.toml
-      - run: uv pip install --system --quiet pytest pyyaml ruff
+      - run: uv pip install --system --quiet pytest pyyaml ruff==0.16.3
       - run: ruff check .
       - run: ruff format --check .
       - run: python -m pytest tests/ -q
