@@ -808,17 +808,13 @@ def check_antipatterns(repo: Repo) -> Result:
     for pattern, message in ANTIPATTERNS:
         if any(re.search(pattern, t) for t in blob.values()):
             fails.append(message)
+    # A coded ignore is mypy's to judge: core's mypy.ini fails one that is unused.
     bare = [
-        f"{p}"
-        for p, t in blob.items()
-        if any(
-            "# type: ignore" in line and "import-untyped" not in line
-            for line in t.splitlines()
-        )
+        f"{p}" for p, t in blob.items() if re.search(r"#\s*type:\s*ignore(?!\[)", t)
     ]
     if bare:
         fails.append(
-            "bare # type: ignore (Platinum: only [import-untyped] with a reason): "
+            "bare # type: ignore (name the error code, as core's mypy.ini demands): "
             + ", ".join(str(p.name) for p in map(pathlib.Path, bare[:3]))
         )
     # `from __future__ import annotations` is deliberately not demanded: Python 3.14
@@ -892,8 +888,17 @@ def check_quality_scale_and_manifest(repo: Repo) -> Result:
     ):
         if not repo.exists(f):
             fails.append(f"missing {f} ({why})")
-    if not repo.exists("pyrightconfig.json"):
-        warns.append("missing pyrightconfig.json")
+    # python-validate runs mypy with --config-file mypy.ini, which is red without one;
+    # this says why. Whether the file is core's is the skill's audit, not a byte check.
+    if not repo.exists("mypy.ini"):
+        fails.append(
+            "missing mypy.ini (python-validate type-checks with --config-file mypy.ini)"
+        )
+    if repo.exists("pyrightconfig.json"):
+        warns.append(
+            "pyrightconfig.json is read by nothing; python-validate type-checks with "
+            "mypy under mypy.ini, so delete it"
+        )
     return fails, warns
 
 

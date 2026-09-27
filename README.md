@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Ruff, Pyright and Pytest` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, pyright on `custom_components/`, pytest on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, pytest on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -31,6 +31,12 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
+  Mypy is pinned to 2.3.1, the version Home Assistant core 2026.9.0 pins, because the
+  consumer's `mypy.ini` is derived from core's and a newer mypy reports errors core has
+  not met yet. Dependabot does not read a `run:` line, so the pin moves by hand when
+  core's `requirements_test.txt` moves it. The job
+  name says what the job is for rather than which tools it runs, because it is half of
+  every consumer's required context: swapping a tool must not rename the check.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
@@ -122,7 +128,7 @@ job ids above give a consumer's ruleset these contexts:
 
 | Caller job | Check-run name | Required context? |
 |---|---|---|
-| `validate` | `validate / Ruff, Pyright and Pytest` | yes |
+| `validate` | `validate / Python validation` | yes |
 | `audit` | `audit / ha-integration conformance check` | yes |
 | `release` | `release / Auto release zip` | no, it runs on publish |
 
@@ -170,7 +176,7 @@ of it, not a substitute.
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
   `*.spec.ts`, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness (a
-  warning when unpinned), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
+  warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
   depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
   warning), and `brand/icon.png`, the one brand file HACS gates a listing on — every other
   brand rule is quality and warns, a logo included, since the brands README says to ship
@@ -191,8 +197,8 @@ of it, not a substitute.
 
 `version_sync.py` compares the Python version across every workflow that sets one up in
 the consumer's own `.github/workflows/`, the three reusable workflows in the
-`.ha-integration-ci/` checkout beside it, ruff's `target-version` and
-`pyrightconfig.json`, and requires the test harness to be pinned. A consumer's own
+`.ha-integration-ci/` checkout beside it, ruff's `target-version` and the
+`python_version` in `mypy.ini`'s `[mypy]` section, and requires the test harness to be pinned. A consumer's own
 workflows are callers and declare nothing, so the comparison that matters is its floor
 against the CI it runs; this repository's own `ci.yml` is read by its own CI, not by a
 consumer's.

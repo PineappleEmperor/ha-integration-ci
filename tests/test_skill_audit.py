@@ -605,7 +605,7 @@ def test_a_job_without_a_name_is_known_by_its_id(repo) -> None:
 def test_a_caller_job_produces_the_prefixed_context(repo) -> None:
     """A job calling a reusable workflow."""
     _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
-    _ruleset(repo, "validate / Ruff, Pyright and Pytest")
+    _ruleset(repo, "validate / Python validation")
     assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
 
 
@@ -1151,6 +1151,18 @@ def test_a_deprecated_api_and_a_bare_ignore_fail(repo) -> None:
     assert any("bare # type: ignore" in f and "notify.py" in f for f in fails)
 
 
+def test_an_ignore_naming_its_error_code_passes(repo) -> None:
+    """Whether a coded ignore is needed is mypy's call; core's config fails an unused one."""
+    _integration(
+        repo,
+        **{
+            "api.py": "import x  # type: ignore[attr-defined]\n"
+            "import y  # type: ignore[import-untyped]\n"
+        },
+    )
+    assert audit.check_antipatterns(audit.Repo(repo)) == ([], [])
+
+
 def test_a_default_branch_with_no_required_checks_fails(repo, monkeypatch) -> None:
     """Every workflow is advisory until the default branch requires it."""
     monkeypatch.setattr(
@@ -1219,6 +1231,30 @@ def test_an_exempt_rule_meets_the_claimed_tier(repo) -> None:
     )
     fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
     assert not any("claims" in f for f in fails)
+
+
+def test_a_missing_mypy_config_fails(repo) -> None:
+    """python-validate passes --config-file mypy.ini, so without one the gate is red."""
+    _integration(repo, **{"quality_scale.yaml": _ledger(**{"strict-typing": "todo"})})
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert any("mypy.ini" in f for f in fails)
+
+    (repo / "mypy.ini").write_text("[mypy]\npython_version = 3.14\n")
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("mypy.ini" in f for f in fails)
+
+
+def test_a_leftover_pyright_config_warns(repo) -> None:
+    """Nothing reads pyrightconfig.json any more; left behind, it reads as the type gate."""
+    _integration(repo, **{"quality_scale.yaml": _ledger()})
+    (repo / "mypy.ini").write_text("[mypy]\npython_version = 3.14\n")
+    _, warns = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("pyrightconfig.json" in w for w in warns)
+
+    (repo / "pyrightconfig.json").write_text("{}")
+    fails, warns = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("pyright" in f for f in fails)
+    assert any("pyrightconfig.json" in w for w in warns)
 
 
 def test_a_manifest_that_is_not_an_object_is_reported_not_crashed(repo) -> None:

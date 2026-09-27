@@ -5,7 +5,7 @@ on:
 
 jobs:
   lint-and-type:
-    name: Ruff, Pyright and Pytest
+    name: Python validation
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,7 +27,7 @@ jobs:
 
       - name: Install
         run: |
-          uv pip install --system homeassistant ruff pyright
+          uv pip install --system homeassistant ruff mypy==2.3.1
           [ -f requirements.test.txt ] && uv pip install --system -r requirements.test.txt || true
 
       - name: Ruff
@@ -35,8 +35,8 @@ jobs:
           ruff check .
           ruff format --check .
 
-      - name: Pyright
-        run: python -m pyright custom_components/
+      - name: Mypy
+        run: mypy --config-file mypy.ini custom_components/
 
       - name: Pytest
         run: |
