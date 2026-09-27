@@ -36,7 +36,8 @@ step runs against the consumer's own checkout.
   and a newer tool reports errors core has not met yet. Dependabot does not read a
   `run:` line, so the pins move by hand when core's `requirements_test.txt` and
   `requirements_test_pre_commit.txt` move them. Pytest's `--timeout=9` is core's per-test
-  limit, so a hung test fails in seconds rather than at the job timeout. The job
+  limit, so a hung test fails in seconds rather than at the job timeout; the flag comes
+  from `pytest-timeout`, which the pinned test harness brings. The job
   name says what the job is for rather than which tools it runs, because it is half of
   every consumer's required context: swapping a tool must not rename the check.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
