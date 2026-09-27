@@ -810,7 +810,7 @@ def check_antipatterns(repo: Repo) -> Result:
             fails.append(message)
     # A coded ignore is mypy's to judge: core's mypy.ini fails one that is unused.
     bare = [
-        f"{p}" for p, t in blob.items() if re.search(r"#\s*type:\s*ignore(?!\[)", t)
+        f"{p}" for p, t in blob.items() if re.search(r"#\s*type:\s*ignore(?!\s*\[)", t)
     ]
     if bare:
         fails.append(

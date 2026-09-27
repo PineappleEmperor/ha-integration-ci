@@ -1180,6 +1180,7 @@ def test_an_ignore_naming_its_error_code_passes(repo) -> None:
         **{
             "api.py": "import x  # type: ignore[attr-defined]\n"
             "import y  # type: ignore[import-untyped]\n"
+            "import z  # type: ignore [assignment]\n"
         },
     )
     assert audit.check_antipatterns(audit.Repo(repo)) == ([], [])
