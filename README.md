@@ -139,7 +139,9 @@ job ids above give a consumer's ruleset these contexts:
 itself runs from by the job names in that checkout, so a ruleset still naming a job from
 before a rename fails. Any other caller, of this repository at another commit or of
 another repository, is known by the prefix it produces, since the checkout holds one
-release only.
+release only. A local run that can see the base branch therefore lets the old name
+through on the bump PR itself, while the base still pins the old release; CI checks the
+consumer out at depth 1, sees no base, and catches it.
 
 ## What the audit checks now
 
