@@ -1176,6 +1176,41 @@ def _matrix_names(name: str, job: dict) -> list[str]:
     ]
 
 
+# This repository. quality-audit.yml checks it out at the running workflow's commit, so a
+# caller pinned at that same commit is known by the job names read here, not by a prefix
+# that would also accept a name the job carried before a rename. A caller pinned at any
+# other commit may run another name, and keeps the prefix.
+_SELF = pathlib.Path(__file__).resolve().parents[1]
+_SELF_SLUG = "PineappleEmperor/ha-integration-ci/"
+
+
+def _self_sha() -> str | None:
+    """The commit this checkout is at, or None when git cannot say."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=_SELF,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def _own_workflow(uses: str) -> dict | None:
+    """The body a caller runs, when it pins this repository at this checkout's commit."""
+    path, _, sha = uses.rpartition("@")
+    if not path.startswith(_SELF_SLUG) or sha != _self_sha():
+        return None
+    try:
+        body = (_SELF / path.removeprefix(_SELF_SLUG)).read_text(encoding="utf-8")
+        return yaml.safe_load(body) or {}
+    except OSError, yaml.YAMLError:
+        return None
+
+
 def _contexts(doc: dict, source: str) -> dict[str, str]:
     """Check-run name -> source, jobs that produce a family recorded as its prefix."""
     out: dict[str, str] = {}
@@ -1183,7 +1218,11 @@ def _contexts(doc: dict, source: str) -> dict[str, str]:
         job = job or {}
         name = str(job.get("name") or jid)
         if "uses" in job:
-            out[f"{name} / "] = source
+            called = _own_workflow(str(job["uses"]))
+            if called is None:
+                out[f"{name} / "] = source
+            else:
+                out.update({f"{name} / {c}": source for c in _contexts(called, source)})
             continue
         for produced in _matrix_names(name, job):
             out[produced] = source

@@ -134,8 +134,11 @@ job ids above give a consumer's ruleset these contexts:
 | `audit` | `audit / ha-integration conformance check` | yes |
 | `release` | `release / Auto release zip` | no, it runs on publish |
 
-`check_required_contexts_have_producers` understands a caller job as the prefix it
-produces.
+`check_required_contexts_have_producers` knows a caller pinned at the commit the audit
+itself runs from by the job names in that checkout, so a ruleset still naming a job from
+before a rename fails. Any other caller, of this repository at another commit or of
+another repository, is known by the prefix it produces, since the checkout holds one
+release only.
 
 ## What the audit checks now
 
@@ -234,7 +237,14 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
 - **Dependabot moves the pin.** A consumer's existing weekly grouped `github-actions`
   update bumps the SHA and the version comment together, so a CI release arrives at every
   integration as the same PR it already receives for its other actions, and goes green
-  with no hand edit. Nothing is copied in that PR.
+  with no hand edit. Nothing is copied in that PR. A major release is the exception: the
+  edits its PR needs before it can go green are listed here, under its version.
+- **v2.0.0's edits.** The required context `validate / Ruff, Pyright and Pytest` becomes
+  `validate / Python validation` in `ruleset.json` and in the live ruleset, since the old
+  name is never reported again and the bump PR waits on it forever; a `mypy.ini` joins
+  the repository root, derived from core's; `pyrightconfig.json` goes. Core's
+  `mypy.ini` disables `import-untyped` and fails an unused ignore, so a
+  `# type: ignore[import-untyped]` the old audit asked for now fails and goes too.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That

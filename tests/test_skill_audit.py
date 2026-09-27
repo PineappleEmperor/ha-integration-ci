@@ -609,6 +609,28 @@ def test_a_caller_job_produces_the_prefixed_context(repo) -> None:
     assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
 
 
+def test_a_caller_at_the_audit_s_own_commit_is_known_by_its_real_job_name(
+    repo, monkeypatch
+) -> None:
+    """The prefix alone passed a ruleset still naming the job from before its rename."""
+    monkeypatch.setattr(audit, "_self_sha", lambda: _SHA)
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    _ruleset(repo, "validate / Ruff, Pyright and Pytest")
+    fails, _ = audit.check_required_contexts_have_producers(audit.Repo(repo))
+    assert len(fails) == 1 and "Ruff, Pyright and Pytest" in fails[0]
+
+    _ruleset(repo, "validate / Python validation")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
+
+
+def test_a_caller_at_another_commit_is_known_by_its_prefix(repo, monkeypatch) -> None:
+    """The checkout holds one release; a caller pinned at another may run another name."""
+    monkeypatch.setattr(audit, "_self_sha", lambda: "1" * 40)
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    _ruleset(repo, "validate / Ruff, Pyright and Pytest")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
+
+
 def test_a_caller_job_never_reports_under_its_bare_id(repo) -> None:
     """A ruleset naming the caller job alone waits on a check-run GitHub never creates."""
     _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
