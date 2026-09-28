@@ -169,9 +169,12 @@ def parse_import_source(name: nodes.Name, imported: str) -> IntegrationModule | 
                 continue
             modname = assignment.modname
             if assignment.level:
-                modname = assignment.root().relative_to_absolute_name(
-                    modname, assignment.level
-                )
+                try:
+                    modname = assignment.root().relative_to_absolute_name(
+                        modname, assignment.level
+                    )
+                except astroid.exceptions.AstroidError:
+                    continue
             if (parsed := parse_module(modname)) is not None:
                 return parsed
     return None

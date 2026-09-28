@@ -1290,6 +1290,23 @@ async def test_call(hass):
     assert _direct_call_messages(linter, checker_class, code) == []
 
 
+@_DIRECT_CALL_CHECKERS
+def test_a_relative_import_above_the_top_package_is_no_crash(
+    linter: UnittestLinter,
+    checker_class: type[BaseChecker],
+    function: str,
+    msg_id: str,
+) -> None:
+    """`from ...` in tests.test_init climbs above the top package; nothing fires."""
+    code = f"""
+from ... import {function}
+
+async def test_call(hass, entry):
+    await {function}(hass, entry)
+"""
+    assert _direct_call_messages(linter, checker_class, code) == []
+
+
 def _integration_module(custom_root: pathlib.Path, code: str, rules: str | None):
     """A parsed pylint_test.sensor, named bare, with its quality_scale.yaml."""
     integration = custom_root / "custom_components/pylint_test"
