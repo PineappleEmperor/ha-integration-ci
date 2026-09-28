@@ -197,7 +197,10 @@ of it, not a substitute.
   `done` or `exempt`, manifest honesty (`integration_type`,
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
-  `*.spec.ts`, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness (a
+  `*.spec.ts`, a `translations/en.json` that is not `strings.json` key for key or that
+  carries a `[%key:…%]` reference (Home Assistant serves `en.json` as written, and only core
+  resolves those references, at build time), the root `conftest.py`,
+  `asyncio_mode = "auto"`, the pinned test harness (a
   warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
   depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
   warning), and `brand/icon.png`, the one brand file HACS gates a listing on — every other

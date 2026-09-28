@@ -970,6 +970,53 @@ def check_docstrings(repo: Repo) -> Result:
     return [], []
 
 
+def _leaves(node, prefix: str = "") -> dict[str, str]:
+    """Every string in a translation file, keyed by its dotted path."""
+    if isinstance(node, dict):
+        out: dict[str, str] = {}
+        for k, v in node.items():
+            out.update(_leaves(v, f"{prefix}{k}."))
+        return out
+    return {prefix.removesuffix("."): str(node)}
+
+
+def check_translations_match_strings(repo: Repo) -> Result:
+    """The English file HA serves is strings.json, with nothing left to resolve."""
+    if not repo.cc:
+        return [], []
+    en_file, strings_file = repo.cc / "translations/en.json", repo.cc / "strings.json"
+    if not en_file.is_file():
+        return [], []
+    try:
+        en = _leaves(json.loads(en_file.read_text(encoding="utf-8")))
+        strings = (
+            _leaves(json.loads(strings_file.read_text(encoding="utf-8")))
+            if strings_file.is_file()
+            else None
+        )
+    except ValueError:
+        return [], []  # malformed JSON is check-json's and hassfest's to report
+    en_rel = en_file.relative_to(repo.root)
+    fails = []
+    if strings is not None:
+        drift = sorted(
+            k for k in en.keys() | strings.keys() if en.get(k) != strings.get(k)
+        )
+        if drift:
+            fails.append(
+                f"{en_rel} differs from strings.json at {', '.join(drift[:6])} — Home "
+                f"Assistant serves {en_rel}, so copy strings.json over it"
+            )
+    refs = sorted(k for k, v in en.items() if "[%key:" in v)
+    if refs:
+        fails.append(
+            f"{en_rel} carries [%key:…%] references at {', '.join(refs[:6])}; only core "
+            "resolves them at build time, so a custom integration shows them raw — write "
+            "the text out"
+        )
+    return fails, []
+
+
 def check_commit_hook(repo: Repo) -> Result:
     """Shipping the hook is not enabling it."""
     hook = repo.root / ".githooks/commit-msg"
@@ -1498,6 +1545,7 @@ CHECKS = (
     check_autolabeler_title_only,
     check_drafter_categories,
     check_docstrings,
+    check_translations_match_strings,
     check_commit_hook,
     check_brand_assets,
     check_release_token,
