@@ -22,7 +22,11 @@ from astroid import nodes
 from pylint.checkers import BaseChecker
 from pylint.lint import PyLinter
 
-from ha_custom_pylint.helpers.module_info import is_test_module, parse_module
+from ha_custom_pylint.helpers.module_info import (
+    is_test_module,
+    parse_import_source,
+    parse_module,
+)
 
 
 class _SetupKind(Enum):
@@ -30,33 +34,6 @@ class _SetupKind(Enum):
 
     INIT = "init"
     PLATFORM = "platform"
-
-
-def _import_source_kind(name: nodes.Name) -> _SetupKind | None:
-    """Classify a name bound by importing an integration's ``async_setup_entry``.
-
-    ha_custom_pylint: core matches the callee's own name, which an alias
-    changes. This reads the ``from ... import`` that binds *name* and
-    classifies its source module instead.
-    """
-    try:
-        _, assignments = name.lookup(name.name)
-    except astroid.exceptions.AstroidError:
-        return None
-    for assignment in assignments:
-        if not isinstance(assignment, nodes.ImportFrom):
-            continue
-        for imported, alias in assignment.names:
-            if imported != "async_setup_entry" or (alias or imported) != name.name:
-                continue
-            modname = assignment.modname
-            if assignment.level:
-                modname = assignment.root().relative_to_absolute_name(
-                    modname, assignment.level
-                )
-            if (parsed := parse_module(modname)) is not None:
-                return _SetupKind.INIT if parsed.module is None else _SetupKind.PLATFORM
-    return None
 
 
 def _resolve_integration_async_setup_entry(call: nodes.Call) -> _SetupKind | None:
@@ -74,8 +51,9 @@ def _resolve_integration_async_setup_entry(call: nodes.Call) -> _SetupKind | Non
         # ha_custom_pylint: a called name is matched on the import that binds
         # it, so `from ... import async_setup_entry as setup` is caught too.
         case nodes.Name():
-            if (kind := _import_source_kind(func)) is not None:
-                return kind
+            source = parse_import_source(func, "async_setup_entry")
+            if source is not None:
+                return _SetupKind.INIT if source.module is None else _SetupKind.PLATFORM
             if func.name != "async_setup_entry":
                 return None
         case _:

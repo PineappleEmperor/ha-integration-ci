@@ -21,7 +21,11 @@ from astroid import nodes
 from pylint.checkers import BaseChecker
 from pylint.lint import PyLinter
 
-from ha_custom_pylint.helpers.module_info import is_test_module, parse_module
+from ha_custom_pylint.helpers.module_info import (
+    is_test_module,
+    parse_import_source,
+    parse_module,
+)
 
 
 def _is_integration_async_setup(call: nodes.Call) -> bool:
@@ -31,6 +35,10 @@ def _is_integration_async_setup(call: nodes.Call) -> bool:
         if func.attrname != "async_setup":
             return False
     elif isinstance(func, nodes.Name):
+        # ha_custom_pylint: a called name is matched on the import that binds
+        # it, so `from ... import async_setup as other` is caught too.
+        if (source := parse_import_source(func, "async_setup")) is not None:
+            return source.module is None
         if func.name != "async_setup":
             return False
     else:

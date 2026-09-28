@@ -35,8 +35,17 @@ from ha_custom_pylint.checkers.imports import HassImportsFormatChecker  # noqa: 
 from ha_custom_pylint.checkers.quality_scale.parallel_updates import (  # noqa: E402
     ParallelUpdatesChecker,
 )
+from ha_custom_pylint.checkers.tests.direct_async_migrate_entry import (  # noqa: E402
+    DirectAsyncMigrateEntry,
+)
+from ha_custom_pylint.checkers.tests.direct_async_setup import (  # noqa: E402
+    DirectAsyncSetup,
+)
 from ha_custom_pylint.checkers.tests.direct_async_setup_entry import (  # noqa: E402
     DirectAsyncSetupEntry,
+)
+from ha_custom_pylint.checkers.tests.direct_async_unload_entry import (  # noqa: E402
+    DirectAsyncUnloadEntry,
 )
 from ha_custom_pylint.helpers import module_info  # noqa: E402
 from ha_custom_pylint.helpers.integration import clear_caches  # noqa: E402
@@ -1182,6 +1191,73 @@ async def test_b(hass, mock_config_entry):
     await async_setup_entry(hass, mock_config_entry)
 """
     assert len(_setup_entry_messages(linter, code, "tests.test_init")) == 2
+
+
+_DIRECT_CALL_CHECKERS = pytest.mark.parametrize(
+    ("checker_class", "function", "msg_id"),
+    [
+        (
+            DirectAsyncMigrateEntry,
+            "async_migrate_entry",
+            "home-assistant-tests-direct-async-migrate-entry",
+        ),
+        (DirectAsyncSetup, "async_setup", "home-assistant-tests-direct-async-setup"),
+        (
+            DirectAsyncUnloadEntry,
+            "async_unload_entry",
+            "home-assistant-tests-direct-async-unload-entry",
+        ),
+    ],
+)
+
+
+def _direct_call_messages(
+    linter: UnittestLinter, checker_class: type[BaseChecker], code: str
+) -> list:
+    _walk(linter, checker_class(linter), astroid.parse(code, "tests.test_init"))
+    return [message.msg_id for message in linter.release_messages()]
+
+
+@_DIRECT_CALL_CHECKERS
+@pytest.mark.parametrize(
+    "imported_as",
+    [pytest.param("", id="by_name"), pytest.param(" as renamed", id="aliased")],
+)
+@pytest.mark.usefixtures("sample_repo")
+def test_a_direct_init_call_is_caught_by_name_or_alias(
+    linter: UnittestLinter,
+    checker_class: type[BaseChecker],
+    function: str,
+    msg_id: str,
+    imported_as: str,
+) -> None:
+    """Core's name match catches the plain call; the import source, the alias too."""
+    called = "renamed" if imported_as else function
+    code = f"""
+from custom_components.sample import {function}{imported_as}
+
+async def test_call(hass, entry):
+    await {called}(hass, entry)
+"""
+    assert _direct_call_messages(linter, checker_class, code) == [msg_id]
+
+
+@_DIRECT_CALL_CHECKERS
+@pytest.mark.usefixtures("sample_repo")
+def test_an_aliased_call_of_something_else_is_not_caught(
+    linter: UnittestLinter,
+    checker_class: type[BaseChecker],
+    function: str,
+    msg_id: str,
+) -> None:
+    """Matching on the import source must not flag an alias of a non-integration."""
+    code = """
+from pytest_homeassistant_custom_component.common import async_fire_time_changed as renamed
+
+async def test_call(hass):
+    renamed(hass)
+"""
+    assert _direct_call_messages(linter, checker_class, code) == []
 
 
 def _integration_module(custom_root: pathlib.Path, code: str, rules: str | None):

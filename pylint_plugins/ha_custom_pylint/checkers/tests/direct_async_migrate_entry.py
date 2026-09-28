@@ -17,7 +17,11 @@ from astroid import nodes
 from pylint.checkers import BaseChecker
 from pylint.lint import PyLinter
 
-from ha_custom_pylint.helpers.module_info import is_test_module, parse_module
+from ha_custom_pylint.helpers.module_info import (
+    is_test_module,
+    parse_import_source,
+    parse_module,
+)
 
 
 def _is_integration_async_migrate_entry(call: nodes.Call) -> bool:
@@ -26,8 +30,13 @@ def _is_integration_async_migrate_entry(call: nodes.Call) -> bool:
     match func:
         case nodes.Attribute(attrname="async_migrate_entry"):
             pass
-        case nodes.Name(name="async_migrate_entry"):
-            pass
+        # ha_custom_pylint: a called name is matched on the import that binds
+        # it, so `from ... import async_migrate_entry as other` is caught too.
+        case nodes.Name():
+            if (source := parse_import_source(func, "async_migrate_entry")) is not None:
+                return source.module is None
+            if func.name != "async_migrate_entry":
+                return False
         case _:
             return False
 

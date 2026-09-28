@@ -6,6 +6,9 @@ from pathlib import Path
 import re
 import sys
 
+import astroid
+from astroid import nodes
+
 _INTEGRATION_ROOT = "homeassistant.components"
 _INTEGRATION_ROOT_DOT = f"{_INTEGRATION_ROOT}."
 _INTEGRATION_TEST_ROOT = "tests.components"
@@ -145,3 +148,30 @@ def get_module_platform(module_name: str) -> str | None:
 def is_test_module(module_name: str) -> bool:
     """Return True if *module_name* is a test module."""
     return module_name.startswith("tests.")
+
+
+def parse_import_source(name: nodes.Name, imported: str) -> IntegrationModule | None:
+    """Parse the integration module that *name* is ``imported`` from, if any.
+
+    ha_custom_pylint: core's direct-call checkers match the callee's own name,
+    which an alias changes. This reads the ``from ... import`` that binds
+    *name* and, when it imports *imported*, parses that import's source.
+    """
+    try:
+        _, assignments = name.lookup(name.name)
+    except astroid.exceptions.AstroidError:
+        return None
+    for assignment in assignments:
+        if not isinstance(assignment, nodes.ImportFrom):
+            continue
+        for original, alias in assignment.names:
+            if original != imported or (alias or original) != name.name:
+                continue
+            modname = assignment.modname
+            if assignment.level:
+                modname = assignment.root().relative_to_absolute_name(
+                    modname, assignment.level
+                )
+            if (parsed := parse_module(modname)) is not None:
+                return parsed
+    return None

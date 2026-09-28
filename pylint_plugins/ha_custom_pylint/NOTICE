@@ -25,7 +25,9 @@ custom_components/<domain> from the repository root. A repo-root tests/
 package is taken to test the one integration in custom_components/.
 
   helpers/module_info.py                 parse_module, is_integration_module and
-                                         get_module_platform accept both names.
+                                         get_module_platform accept both names;
+                                         parse_import_source parses the module a
+                                         called name was imported from.
   helpers/integration.py                 read_manifest finds the domain of a bare
                                          name; custom_test_domain names the
                                          integration a repo-root tests/ tests.
@@ -39,9 +41,12 @@ package is taken to test the one integration in custom_components/.
                                          modules is inspected, as core inspects those
                                          under homeassistant.
   checkers/tests/direct_async_setup_entry.py
+  checkers/tests/direct_async_migrate_entry.py
+  checkers/tests/direct_async_setup.py
+  checkers/tests/direct_async_unload_entry.py
                                          a called name is matched on the import that
                                          binds it, so an aliased import no longer
-                                         evades W7418 and W7420.
+                                         evades W7418, W7420, W7421, W7422 or W7426.
 
 Change 2: R7403 reads a custom repository's conftest files. Core's walk in
 checkers/tests/redundant_usefixtures.py stops below the tests root. Ours also

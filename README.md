@@ -71,8 +71,9 @@ step runs against the consumer's own checkout.
   `NOTICE` lists file by file: the name gate also accepts `custom_components.<domain>` and
   the bare `<domain>` pylint uses when it lints `custom_components/<domain>` from the
   repository root, where a `manifest.json` beside it confirms the integration; a
-  repo-root `tests/` owns the one integration beside it; W7418 and W7420 match a called
-  name on the import that binds it, so an alias no longer evades them; and R7403 reads
+  repo-root `tests/` owns the one integration beside it; W7418, W7420, W7421, W7422 and
+  W7426 match a called name on the import that binds it, so an alias no longer evades
+  them; and R7403 reads
   `tests/conftest.py` and the root `conftest.py`. python-validate runs it after the
   checkout, with every other pylint check off, and fails on any hit. The ids it enables
   come from `UPSTREAM.json`, which records for each one the core file it came from and
