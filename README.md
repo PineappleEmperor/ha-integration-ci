@@ -37,11 +37,12 @@ step runs against the consumer's own checkout.
   newer tool reports errors core has not met yet. The prek action installs the latest
   prek unless its `prek-version` names one, so the step names core's. Dependabot reads
   neither a `run:` line nor an action input, so the pins move by hand when core's
-  `requirements_test.txt` and `requirements_test_pre_commit.txt` move them. Pytest's `--timeout=9` is core's per-test
-  limit, so a hung test fails in seconds rather than at the job timeout; the flag comes
-  from `pytest-timeout`, which the pinned test harness brings. The job
-  name says what the job is for rather than which tools it runs, because it is half of
-  every consumer's required context: swapping a tool must not rename the check.
+  `requirements_test.txt` and `requirements_test_pre_commit.txt` move them. Pytest's
+  `--timeout=9` is core's per-test limit, so a hung test fails in seconds rather than at
+  the job timeout; the flag comes from `pytest-timeout`, which the pinned test harness
+  brings. The job name says what the job is for rather than which tools it runs, because
+  it is half of every consumer's required context: swapping a tool must not rename the
+  check.
 - **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
   `check_translations` fixture in core's `tests/components/conftest.py` at 2026.9.0.
   pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
@@ -52,12 +53,12 @@ step runs against the consumer's own checkout.
   the `exception-translations` rule is read from the `quality_scale.yaml` of the
   repository's one integration, where core keys it on the test's own path; the message
   names both `strings.json` and `translations/en.json`, which the audit holds equal; and
-  a service a test registers is recognised by the
-  consumer's own `tests/` directory. It keeps core's `ignore_missing_translations` and
-  `ignore_translations_for_mock_domains` fixtures for a test to override. python-validate
-  checks this repository out at `github.job_workflow_sha`, as quality-audit does, and loads
-  the plugin with `-p ha_translations`; the checkout comes after ruff and mypy so neither
-  lints it. A local run gets the same check with
+  a service a test registers is recognised by the consumer's own `tests/` directory. It
+  keeps core's `ignore_missing_translations` and `ignore_translations_for_mock_domains`
+  fixtures for a test to override. python-validate checks this repository out at
+  `github.job_workflow_sha`, as quality-audit does, and loads the plugin with
+  `-p ha_translations`; the checkout comes after ruff and mypy so neither lints it. A
+  local run gets the same check with
   `PYTHONPATH=<a clone of this repository>/pytest_plugins pytest -p ha_translations`.
 - **The coverage gate** is `scripts/coverage_gate.py`, run on the JSON report pytest-cov
   writes. Core's `codecov.yml` gives twelve module kinds, the script's `FULL` list from
@@ -167,9 +168,9 @@ step runs against the consumer's own checkout.
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
   are the consumer's `.pre-commit-config.yaml` hooks — the ha-integration skill's template
   lists them — so a misspelt word in the Python, or a `strings.json` whose keys are out of
-  order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`, which would fail every
-  push to `main` as core's CI also skips it, and the two ruff hooks, which the pinned ruff
-  step already runs.
+  order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`,
+  which would fail every push to `main` as core's CI also skips it, and the two ruff
+  hooks, which the pinned ruff step already runs.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
