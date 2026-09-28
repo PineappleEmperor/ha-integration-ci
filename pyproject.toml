@@ -208,6 +208,7 @@ split-on-trailing-comma = false
 
 [tool.ruff.lint.per-file-ignores]
 "custom_components/**" = ["PTH"]
+"custom_components/*/*/*" = ["TID252"]
 "tests/**" = ["PTH"]
 "scripts/*" = ["T20", "INP001"]
 "pytest_plugins/*" = ["INP001"]
