@@ -27,7 +27,8 @@ jobs:
 
       - name: Install
         run: |
-          uv pip install --system homeassistant ruff==0.16.3 mypy==2.3.1
+          uv pip install --system homeassistant ruff==0.16.3 mypy==2.3.1 \
+            pylint==4.0.7 astroid==4.0.4
           [ -f requirements.test.txt ] && uv pip install --system -r requirements.test.txt || true
 
       - name: Ruff
@@ -50,6 +51,20 @@ jobs:
           ref: ${{ github.job_workflow_sha }}
           path: .ha-integration-ci
           persist-credentials: false
+
+      - name: Pylint
+        env:
+          PYTHONPATH: .ha-integration-ci/pylint_plugins
+        run: |
+          RULES=$(python -c "import json; print(','.join(json.load(open('.ha-integration-ci/pylint_plugins/ha_custom_pylint/UPSTREAM.json'))['carried']))")
+          status=0
+          pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
+            --persistent=n custom_components/ || status=1
+          if [ -d tests ]; then
+            pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
+              --persistent=n tests/ || status=1
+          fi
+          exit "$status"
 
       - name: Pytest
         env:

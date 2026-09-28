@@ -1,0 +1,352 @@
+{
+  "core_tag": "2026.9.0",
+  "source": "https://github.com/home-assistant/core/tree/2026.9.0/pylint/plugins/pylint_home_assistant",
+  "carried": {
+    "C7401": {
+      "symbol": "home-assistant-logger-period",
+      "file": "checkers/logger.py",
+      "sha256": "3b942023f26a4d1375a54dec3e9346bda22e488d21549e197eb629fb1aa03fe0"
+    },
+    "C7402": {
+      "symbol": "home-assistant-logger-capital",
+      "file": "checkers/logger.py",
+      "sha256": "3b942023f26a4d1375a54dec3e9346bda22e488d21549e197eb629fb1aa03fe0"
+    },
+    "C7403": {
+      "symbol": "home-assistant-relative-import",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
+    "C7405": {
+      "symbol": "home-assistant-component-root-import",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
+    "C7406": {
+      "symbol": "home-assistant-helper-namespace-import",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
+    "C7407": {
+      "symbol": "home-assistant-import-constant-alias",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
+    "C7408": {
+      "symbol": "home-assistant-import-constant-unnecessary-alias",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
+    "C7409": {
+      "symbol": "home-assistant-enforce-sorted-platforms",
+      "file": "checkers/sorted_platforms.py",
+      "sha256": "4d5640f0971efa072d28d25a18ea02e06f80b1093dffede1f37d57835cad7b2b"
+    },
+    "C7410": {
+      "symbol": "home-assistant-enforce-greek-micro-char",
+      "file": "checkers/greek_micro_char.py",
+      "sha256": "579e7f7d7beb89d97dd7d5cf6025bcea591eff9f5dad69ee436d2e362438767a"
+    },
+    "C7411": {
+      "symbol": "home-assistant-enforce-class-module",
+      "file": "checkers/class_module.py",
+      "sha256": "534fa52636f63657ce08a80be3dfc2227b58ea14ad17d6bbf38824e715c1f17b"
+    },
+    "C7412": {
+      "symbol": "home-assistant-entity-description-redundant-default",
+      "file": "checkers/entity_description_defaults.py",
+      "sha256": "c40dca7a34e2d0566d181d10a6245a0e92d9585435dfa8d08db16e6db685d77f"
+    },
+    "C7413": {
+      "symbol": "home-assistant-duplicate-const",
+      "file": "checkers/duplicate_const.py",
+      "sha256": "bc0f0e4ef8c196b59f671e5e5a3e1b8ba7139b3c0dbfe5a55f25cc2032df71fb"
+    },
+    "C7414": {
+      "symbol": "home-assistant-enforce-utcnow",
+      "file": "checkers/utcnow.py",
+      "sha256": "667471686ad90efb78e935c1d3ee6ea091d5bc334db76fe63aca41b0a968900d"
+    },
+    "C7415": {
+      "symbol": "home-assistant-domain-argument",
+      "file": "checkers/domain_constant.py",
+      "sha256": "e01f7f78d9f3e70adadc1586f2e4796fab883a279f6a2e1b8c4257978684180b"
+    },
+    "C7425": {
+      "symbol": "home-assistant-enforce-now",
+      "file": "checkers/now.py",
+      "sha256": "6aa2f3cd882fdc159623389afcccd57c2ab08d4560b9de69eeadf02d4cc0aa6d"
+    },
+    "C7427": {
+      "symbol": "home-assistant-enforce-naive-now",
+      "file": "checkers/naive_now.py",
+      "sha256": "82545273883e4fcd04af1e550fafd1438df30e679231ea13321743fde4bc4f04"
+    },
+    "E7401": {
+      "symbol": "home-assistant-invalid-inheritance",
+      "file": "checkers/inheritance.py",
+      "sha256": "04a13f590e969a5bab9751ae80c78aa106ea61341c7140d731e8508c14660375"
+    },
+    "E7402": {
+      "symbol": "home-assistant-argument-type",
+      "file": "checkers/type_hints/__init__.py",
+      "sha256": "d13f688ac7b85dde7ef81e188978dd531529ad5bd771137553ec8c6538800aa6"
+    },
+    "E7403": {
+      "symbol": "home-assistant-return-type",
+      "file": "checkers/type_hints/__init__.py",
+      "sha256": "d13f688ac7b85dde7ef81e188978dd531529ad5bd771137553ec8c6538800aa6"
+    },
+    "E7404": {
+      "symbol": "home-assistant-missing-super-call",
+      "file": "checkers/super_call.py",
+      "sha256": "0eca74600e6d91649be9b45ab3ce5fac813996e0c1194e27e2f80eac0cac8cc3"
+    },
+    "E7405": {
+      "symbol": "home-assistant-action-swallowed-exception",
+      "file": "checkers/actions/swallowed_exceptions.py",
+      "sha256": "cc2287b341467af6d3db2e0a060fcfb4c7d734ea57483b1516b7c035b84aedcc"
+    },
+    "E7406": {
+      "symbol": "home-assistant-exception-translation-key-missing",
+      "file": "checkers/exception_translations.py",
+      "sha256": "896ede6955b697e3b6b404677204f091ef6366a951553aebee338589699e6b82"
+    },
+    "E7408": {
+      "symbol": "home-assistant-exception-translation-key-domain-mismatch",
+      "file": "checkers/exception_translations.py",
+      "sha256": "896ede6955b697e3b6b404677204f091ef6366a951553aebee338589699e6b82"
+    },
+    "E7409": {
+      "symbol": "home-assistant-mdi-icon-not-found",
+      "file": "checkers/mdi_icons.py",
+      "sha256": "af284daea8dbc289cbd5bff96f4578f50c9a6a9ec091d628465cf73625cff019"
+    },
+    "E7410": {
+      "symbol": "home-assistant-mdi-icon-json-not-found",
+      "file": "checkers/mdi_icons.py",
+      "sha256": "af284daea8dbc289cbd5bff96f4578f50c9a6a9ec091d628465cf73625cff019"
+    },
+    "E7418": {
+      "symbol": "home-assistant-exception-placeholder-mismatch",
+      "file": "checkers/exception_translations.py",
+      "sha256": "896ede6955b697e3b6b404677204f091ef6366a951553aebee338589699e6b82"
+    },
+    "R7401": {
+      "symbol": "home-assistant-consider-usefixtures-decorator",
+      "file": "checkers/type_hints/__init__.py",
+      "sha256": "d13f688ac7b85dde7ef81e188978dd531529ad5bd771137553ec8c6538800aa6"
+    },
+    "R7402": {
+      "symbol": "home-assistant-unused-test-fixture-argument",
+      "file": "checkers/unused_test_fixture_args.py",
+      "sha256": "1c0144b8be079d5c9f6e7a5958af0e7952b29ad4ca983c391579d5b9607a959f"
+    },
+    "R7403": {
+      "symbol": "home-assistant-tests-redundant-usefixtures",
+      "file": "checkers/tests/redundant_usefixtures.py",
+      "sha256": "7ef26b288c845a332a96919d62d1cdd76f78574eedc767db1da3432213dafd01"
+    },
+    "R7404": {
+      "symbol": "home-assistant-tests-registry-fixtures",
+      "file": "checkers/tests/registry_fixtures.py",
+      "sha256": "21a5a8ec423661fc82818211c0967107705d4c2676c10bd4b28ceaf93ea77a55"
+    },
+    "W7401": {
+      "symbol": "home-assistant-deprecated-import",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
+    "W7402": {
+      "symbol": "home-assistant-async-callback-decorator",
+      "file": "checkers/decorator.py",
+      "sha256": "62236f114d66552d9910ad5f3710864f4bb076b3be013ce40a046006e889b74a"
+    },
+    "W7403": {
+      "symbol": "home-assistant-pytest-fixture-decorator",
+      "file": "checkers/decorator.py",
+      "sha256": "62236f114d66552d9910ad5f3710864f4bb076b3be013ce40a046006e889b74a"
+    },
+    "W7404": {
+      "symbol": "home-assistant-async-load-fixtures",
+      "file": "checkers/async_fixtures.py",
+      "sha256": "d505fe5d2e99157a6ac50bdf33827e3ee6e575d28846efc60adf6f56bc3f7eaf"
+    },
+    "W7405": {
+      "symbol": "home-assistant-use-runtime-data",
+      "file": "checkers/runtime_data.py",
+      "sha256": "e75b297a8a44e9f8f225653d6e8012ffd35b30b057457d59fd74aef45cde162f"
+    },
+    "W7406": {
+      "symbol": "home-assistant-unique-id-ip-based",
+      "file": "checkers/config_flow/unique_id_no_ip.py",
+      "sha256": "d7e7aa41520d0424444644b5d0dcf63b7b7440fbe2ca870e0511df270c7b8726"
+    },
+    "W7407": {
+      "symbol": "home-assistant-config-flow-polling-field",
+      "file": "checkers/config_flow/no_polling.py",
+      "sha256": "2d87c57fff6fa4a86dc04bb7ac4f0d7807df870baf1b702ad5abdb039b565467"
+    },
+    "W7408": {
+      "symbol": "home-assistant-config-flow-name-field",
+      "file": "checkers/config_flow/no_name.py",
+      "sha256": "473220d3bf4578f2f4326051ac34a8858c021d8b9c78ed861381a4e3e04b64cd"
+    },
+    "W7409": {
+      "symbol": "home-assistant-test-non-deterministic",
+      "file": "checkers/test_determinism.py",
+      "sha256": "67ff9ca06e24791dfc26c919ee54a550bc5a98527242613981ed12365d78bbcc"
+    },
+    "W7410": {
+      "symbol": "home-assistant-missing-reauthentication-flow",
+      "file": "checkers/quality_scale/reauthentication_flow.py",
+      "sha256": "094263600f7c9791b096bc2b13eab471d61e194fb9006c93298f1cb2d9a858b6"
+    },
+    "W7411": {
+      "symbol": "home-assistant-missing-parallel-updates",
+      "file": "checkers/quality_scale/parallel_updates.py",
+      "sha256": "7d4fa1e87340a4641c7268d123539386085999b48d472a6326ad0487edd13d53"
+    },
+    "W7412": {
+      "symbol": "home-assistant-missing-diagnostics",
+      "file": "checkers/quality_scale/diagnostics.py",
+      "sha256": "81bc2a166ff2091bc5c99a49a9025359c3d598e90e5544263ab84d322ad768fc"
+    },
+    "W7413": {
+      "symbol": "home-assistant-missing-config-entry-unloading",
+      "file": "checkers/quality_scale/config_entry_unloading.py",
+      "sha256": "f63015fd61f2fe4655398b83ba82997b323c409594719e437d8d3ad2d5f249cb"
+    },
+    "W7414": {
+      "symbol": "home-assistant-service-registered-in-setup-entry",
+      "file": "checkers/actions/service_registration.py",
+      "sha256": "bcfe24dfb57d0c292eff3927619d55861893eabb6ab163870b3e85cb38dd20a5"
+    },
+    "W7415": {
+      "symbol": "home-assistant-sequential-executor-jobs",
+      "file": "checkers/sequential_executor_jobs.py",
+      "sha256": "425f7dab647b20efa0b15cd2deb0c0a1ff350e61897f16bc53acf1f6768597bb"
+    },
+    "W7416": {
+      "symbol": "home-assistant-missing-has-entity-name",
+      "file": "checkers/quality_scale/has_entity_name.py",
+      "sha256": "2b9e47bca889a5c6773bc4484d78d2b4cad4f06f12aa165a7f0e7a4aadfcc421"
+    },
+    "W7417": {
+      "symbol": "home-assistant-exception-not-translated",
+      "file": "checkers/exception_translations.py",
+      "sha256": "896ede6955b697e3b6b404677204f091ef6366a951553aebee338589699e6b82"
+    },
+    "W7418": {
+      "symbol": "home-assistant-tests-direct-async-setup-entry",
+      "file": "checkers/tests/direct_async_setup_entry.py",
+      "sha256": "08cdc88baf24827b4f99fdcf7efe92027239ad7204c2491bcdaedc1739d26f4d"
+    },
+    "W7419": {
+      "symbol": "home-assistant-exception-message-with-translation",
+      "file": "checkers/exception_translations.py",
+      "sha256": "896ede6955b697e3b6b404677204f091ef6366a951553aebee338589699e6b82"
+    },
+    "W7420": {
+      "symbol": "home-assistant-tests-direct-platform-async-setup-entry",
+      "file": "checkers/tests/direct_async_setup_entry.py",
+      "sha256": "08cdc88baf24827b4f99fdcf7efe92027239ad7204c2491bcdaedc1739d26f4d"
+    },
+    "W7421": {
+      "symbol": "home-assistant-tests-direct-async-migrate-entry",
+      "file": "checkers/tests/direct_async_migrate_entry.py",
+      "sha256": "ab69aeb1df437e050fd89d68eed5f2f2a7db6ea89fc4b8a2ed6459aba7c145a5"
+    },
+    "W7422": {
+      "symbol": "home-assistant-tests-direct-async-setup",
+      "file": "checkers/tests/direct_async_setup.py",
+      "sha256": "a68d973616020bb8a180acdbccb06b98d30d4aa688792368df57797695cb5925"
+    },
+    "W7423": {
+      "symbol": "home-assistant-missing-entity-unique-id",
+      "file": "checkers/quality_scale/entity_unique_id.py",
+      "sha256": "8920d0708ad01c3180dc466b04d736e598647c7f2716373feabb19e911dc6eaf"
+    },
+    "W7424": {
+      "symbol": "home-assistant-entity-unique-id-static",
+      "file": "checkers/quality_scale/entity_unique_id.py",
+      "sha256": "8920d0708ad01c3180dc466b04d736e598647c7f2716373feabb19e911dc6eaf"
+    },
+    "W7425": {
+      "symbol": "home-assistant-entity-unique-id-redundant-domain",
+      "file": "checkers/entity_unique_id_format.py",
+      "sha256": "26d17e9953ccb40d3ff1f687a10a04ddf39de26a8a9f1601bb81df75990c0b8c"
+    },
+    "W7426": {
+      "symbol": "home-assistant-tests-direct-async-unload-entry",
+      "file": "checkers/tests/direct_async_unload_entry.py",
+      "sha256": "b329a9ca44e7193dfda40f553ad72f73da52053249e580659b9b7a4a84b6be69"
+    },
+    "W7427": {
+      "symbol": "home-assistant-entity-unique-id-redundant-platform",
+      "file": "checkers/entity_unique_id_format.py",
+      "sha256": "26d17e9953ccb40d3ff1f687a10a04ddf39de26a8a9f1601bb81df75990c0b8c"
+    },
+    "W7428": {
+      "symbol": "home-assistant-config-flow-field-not-translated",
+      "file": "checkers/flow_translations.py",
+      "sha256": "876c8f28878ca2f2afbc82027afbf8a31d9cb5904bc34fa7b9a6f2d392090fc6"
+    },
+    "W7429": {
+      "symbol": "home-assistant-unnecessary-format-mac",
+      "file": "checkers/unnecessary_format_mac.py",
+      "sha256": "feefe878ca8bc9acb76064f4a5be6c50f299503bfaa863db613474e0a360a7e4"
+    },
+    "W7430": {
+      "symbol": "home-assistant-serial-port-selector-usb-dependency",
+      "file": "checkers/config_flow/serial_port_usb_dependency.py",
+      "sha256": "4d6cc3b1523c36b8a9f53398f7b8d708df6efc09551bf860e63a64470dc03bd1"
+    },
+    "W7431": {
+      "symbol": "home-assistant-options-flow-field-not-translated",
+      "file": "checkers/flow_translations.py",
+      "sha256": "876c8f28878ca2f2afbc82027afbf8a31d9cb5904bc34fa7b9a6f2d392090fc6"
+    },
+    "W7432": {
+      "symbol": "home-assistant-subentry-flow-field-not-translated",
+      "file": "checkers/flow_translations.py",
+      "sha256": "876c8f28878ca2f2afbc82027afbf8a31d9cb5904bc34fa7b9a6f2d392090fc6"
+    },
+    "W7433": {
+      "symbol": "home-assistant-missing-test-before-configure",
+      "file": "checkers/quality_scale/test_before_configure.py",
+      "sha256": "3280ef278d7f34f47403451b61eecc1bace68cb2bac686c1f8b4de13c646a05b"
+    }
+  },
+  "skipped": {
+    "C7404": {
+      "symbol": "home-assistant-absolute-import",
+      "reason": "ruff TID252 (ban-relative-imports = parents) already bans a relative import that climbs out of the integration"
+    }
+  },
+  "support_files": {
+    "__init__.py": "d7302eecd0561f62cf2bd6368730f8fcca8bd572234a89d22d13871dcd1bc6dc",
+    "checkers/__init__.py": "9ad7e6613de60c13ca1da7f87792524714ffde49218d558ef18ef78918afeffc",
+    "checkers/actions/__init__.py": "785dc0c3f35a97d78257a457b4cb8f44c753de9ad9ee5575e2343aa2bdf601f0",
+    "checkers/actions/const.py": "9df24dd50a8620ab6b68b04a556b76ee389a18dac2cf88ad955ff2ff2549da19",
+    "checkers/actions/helpers.py": "f3320729b8b8172ec462e37ed61c5829126bb2646dffe0354baf718999f00c9a",
+    "checkers/config_flow/__init__.py": "84298b94d699a1f8268c68602e71b2b26ae7f8ead4e81ec128f49977da21b370",
+    "checkers/quality_scale/__init__.py": "b777fbd4d36abf575ee966c75f165c6d33aedc1d7dd5d91b99d7ac555a305cde",
+    "checkers/tests/__init__.py": "5303c8aa69c0ce5f9d40ea8f3c35dc45cb47ad7bf4cd7a9c9f092a640e84a61e",
+    "checkers/type_hints/const.py": "51fb2556c56153485dc57e90f8aa433807302da8304faeffdf4a40596a29aeb5",
+    "checkers/type_hints/models.py": "2ef0539ec21b4c7f0afbcb8b505b7efdf07fbab3cd5adfed4d35447b6bf613e2",
+    "checkers/type_hints/validators.py": "be4516b3f3d2c17e48a6424bb8341ed7daadc1d85f093b848a4f2745a337afb3",
+    "const.py": "60163a3c2db509d5a484ae71a3dd044893c7e60255aeae7273c183fe3658c06d",
+    "generated/__init__.py": "e96f3268a51dab61ce02ca26351014631c80bdb186aada1b4f7bae61ad83459e",
+    "generated/mdi_icons.py": "0ef9ae8aa1c07174acf55551bd88f71c1835091111c667e2a4e3acaf979082a9",
+    "helpers/__init__.py": "c2f7cb6034ecc0aa9180f81e1f1d2417b8bec516ba5252272c23795e837ef9ef",
+    "helpers/ast_utils.py": "f7d7367b0e7b3868e7fcaa3d3ca7afa23c45e384fbb5763ef08fb6d8c81d1a6a",
+    "helpers/datetime_now.py": "880dedab4fb07a408ceb6ccc89eca4698fc0de8717855a7db332f469d7d84467",
+    "helpers/entity_class.py": "f4eb782807c0c927c2b457da39ad65fe10db12ec18e3f04dd231a717ef0323c8",
+    "helpers/icons.py": "e4d0f2d200717a0a49dc877da811a64449c1d3cd33deb203b5c8e29ea3a66105",
+    "helpers/integration.py": "95eca20d5771b205e61b574213e92b00bc3f0cf1cf13e5345c3eff07cd438cb8",
+    "helpers/module_info.py": "65d6a6c75c132287e0d22b167bc7db371703b0ac1c30511f71a240d7972ecd68",
+    "helpers/quality_scale.py": "dc45d77b0fce3a51a3cb8664c56a8826a7723d608aa590b598ef5366f243e7bd",
+    "helpers/translations.py": "51c4721e6dc1f892da005ed3785918f9010a0b2c149c7f989b75fedc578c353f"
+  }
+}

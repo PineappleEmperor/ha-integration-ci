@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, core's pylint rules on `custom_components/` and on `tests/` when it exists, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -31,9 +31,10 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
-  Ruff and mypy are pinned to 0.16.3 and 2.3.1, the versions Home Assistant core
-  2026.9.0 pins, because the consumer's rule set and `mypy.ini` are derived from core's
-  and a newer tool reports errors core has not met yet. Dependabot does not read a
+  Ruff, mypy and pylint are pinned to 0.16.3, 2.3.1 and 4.0.7, with pylint's astroid at
+  4.0.4, the versions Home Assistant core 2026.9.0 pins, because the consumer's rule set,
+  `mypy.ini` and pylint rules are derived from core's and a newer tool reports errors
+  core has not met yet. Dependabot does not read a
   `run:` line, so the pins move by hand when core's `requirements_test.txt` and
   `requirements_test_pre_commit.txt` move them. Pytest's `--timeout=9` is core's per-test
   limit, so a hung test fails in seconds rather than at the job timeout; the flag comes
@@ -60,6 +61,91 @@ step runs against the consumer's own checkout.
   since the setup screens and the support dump are what a user meets when something is
   wrong. Other modules carry no threshold here, as core's patch target does not bind them.
   pytest-cov arrives with the pinned test harness.
+- **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
+  in core's `pylint/plugins` at 2026.9.0, under Apache-2.0 with its `NOTICE`. Core's
+  plugin decides what an integration is by the module name `homeassistant.components.<domain>`,
+  which a custom integration never has, so run as published it stays silent on most of
+  one, and its README says it is not for external use. The copy keeps core's checkers,
+  message ids and symbols, so a diff against core stays readable, and changes only what
+  `NOTICE` lists file by file: the name gate also accepts `custom_components.<domain>` and
+  the bare `<domain>` pylint uses when it lints `custom_components/<domain>` from the
+  repository root, where a `manifest.json` beside it confirms the integration; a
+  repo-root `tests/` owns the one integration beside it; W7418 and W7420 match a called
+  name on the import that binds it, so an alias no longer evades them; and R7403 reads
+  `tests/conftest.py` and the root `conftest.py`. python-validate runs it after the
+  checkout, with every other pylint check off, and fails on any hit. The ids it enables
+  come from `UPSTREAM.json`, which records for each one the core file it came from and
+  that file's sha256 at the tag. R7402 is on although core's own config disables it while
+  core clears old violations, since a new repository has none. The set is every message
+  core defines at 2026.9.0 but one:
+
+  | Id | Symbol | Status |
+  |---|---|---|
+  | C7401 | `home-assistant-logger-period` | carried |
+  | C7402 | `home-assistant-logger-capital` | carried |
+  | C7403 | `home-assistant-relative-import` | carried |
+  | C7404 | `home-assistant-absolute-import` | skipped: ruff's TID252 already bans a relative import that climbs out of the integration |
+  | C7405 | `home-assistant-component-root-import` | carried |
+  | C7406 | `home-assistant-helper-namespace-import` | carried |
+  | C7407 | `home-assistant-import-constant-alias` | carried |
+  | C7408 | `home-assistant-import-constant-unnecessary-alias` | carried |
+  | C7409 | `home-assistant-enforce-sorted-platforms` | carried |
+  | C7410 | `home-assistant-enforce-greek-micro-char` | carried |
+  | C7411 | `home-assistant-enforce-class-module` | carried |
+  | C7412 | `home-assistant-entity-description-redundant-default` | carried |
+  | C7413 | `home-assistant-duplicate-const` | carried |
+  | C7414 | `home-assistant-enforce-utcnow` | carried |
+  | C7415 | `home-assistant-domain-argument` | carried |
+  | C7425 | `home-assistant-enforce-now` | carried |
+  | C7427 | `home-assistant-enforce-naive-now` | carried |
+  | E7401 | `home-assistant-invalid-inheritance` | carried |
+  | E7402 | `home-assistant-argument-type` | carried |
+  | E7403 | `home-assistant-return-type` | carried |
+  | E7404 | `home-assistant-missing-super-call` | carried |
+  | E7405 | `home-assistant-action-swallowed-exception` | carried |
+  | E7406 | `home-assistant-exception-translation-key-missing` | carried |
+  | E7408 | `home-assistant-exception-translation-key-domain-mismatch` | carried |
+  | E7409 | `home-assistant-mdi-icon-not-found` | carried |
+  | E7410 | `home-assistant-mdi-icon-json-not-found` | carried |
+  | E7418 | `home-assistant-exception-placeholder-mismatch` | carried |
+  | R7401 | `home-assistant-consider-usefixtures-decorator` | carried |
+  | R7402 | `home-assistant-unused-test-fixture-argument` | carried |
+  | R7403 | `home-assistant-tests-redundant-usefixtures` | carried |
+  | R7404 | `home-assistant-tests-registry-fixtures` | carried |
+  | W7401 | `home-assistant-deprecated-import` | carried |
+  | W7402 | `home-assistant-async-callback-decorator` | carried |
+  | W7403 | `home-assistant-pytest-fixture-decorator` | carried |
+  | W7404 | `home-assistant-async-load-fixtures` | carried |
+  | W7405 | `home-assistant-use-runtime-data` | carried |
+  | W7406 | `home-assistant-unique-id-ip-based` | carried |
+  | W7407 | `home-assistant-config-flow-polling-field` | carried |
+  | W7408 | `home-assistant-config-flow-name-field` | carried |
+  | W7409 | `home-assistant-test-non-deterministic` | carried |
+  | W7410 | `home-assistant-missing-reauthentication-flow` | carried |
+  | W7411 | `home-assistant-missing-parallel-updates` | carried |
+  | W7412 | `home-assistant-missing-diagnostics` | carried |
+  | W7413 | `home-assistant-missing-config-entry-unloading` | carried |
+  | W7414 | `home-assistant-service-registered-in-setup-entry` | carried |
+  | W7415 | `home-assistant-sequential-executor-jobs` | carried |
+  | W7416 | `home-assistant-missing-has-entity-name` | carried |
+  | W7417 | `home-assistant-exception-not-translated` | carried |
+  | W7418 | `home-assistant-tests-direct-async-setup-entry` | carried |
+  | W7419 | `home-assistant-exception-message-with-translation` | carried |
+  | W7420 | `home-assistant-tests-direct-platform-async-setup-entry` | carried |
+  | W7421 | `home-assistant-tests-direct-async-migrate-entry` | carried |
+  | W7422 | `home-assistant-tests-direct-async-setup` | carried |
+  | W7423 | `home-assistant-missing-entity-unique-id` | carried |
+  | W7424 | `home-assistant-entity-unique-id-static` | carried |
+  | W7425 | `home-assistant-entity-unique-id-redundant-domain` | carried |
+  | W7426 | `home-assistant-tests-direct-async-unload-entry` | carried |
+  | W7427 | `home-assistant-entity-unique-id-redundant-platform` | carried |
+  | W7428 | `home-assistant-config-flow-field-not-translated` | carried |
+  | W7429 | `home-assistant-unnecessary-format-mac` | carried |
+  | W7430 | `home-assistant-serial-port-selector-usb-dependency` | carried |
+  | W7431 | `home-assistant-options-flow-field-not-translated` | carried |
+  | W7432 | `home-assistant-subentry-flow-field-not-translated` | carried |
+  | W7433 | `home-assistant-missing-test-before-configure` | carried |
+
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
@@ -283,8 +369,9 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   repository without the skill's `.pre-commit-config.yaml` adds it, with the `.yamllint`,
   `.prettierrc.js` and `.prettierignore` it reads; `translations/en.json` becomes an exact
   copy of `strings.json` with every `[%key:…%]` written out; the tests reach every line of
-  `config_flow.py` and `diagnostics.py`; and every message the tests make a flow, repair
-  issue or action show has its text in `translations/en.json`.
+  `config_flow.py` and `diagnostics.py`; every message the tests make a flow, repair
+  issue or action show has its text in `translations/en.json`; and the integration and
+  its tests pass the pylint rules.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
@@ -331,7 +418,9 @@ the suite reaches. It installs pytest-homeassistant-custom-component at the vers
 skill's template pins, because `tests/test_ha_translations.py` runs a sample integration's
 suite under the plugin in a child pytest; `-p no:homeassistant` keeps that harness out of
 this suite's own run, whose sync tests its autouse async fixtures would break, and the
-test module skips when the harness is absent.
+test module skips when the harness is absent. It installs pylint and astroid at
+python-validate's pins, because `tests/test_ha_custom_pylint.py` lints sample
+repositories with the pylint rules in a child pylint and skips without them.
 
 Every check in `scripts/skill_audit.py` is a function returning `(failures, warnings)`
 and has a test in `tests/test_skill_audit.py`. A changed check gets its test changed
