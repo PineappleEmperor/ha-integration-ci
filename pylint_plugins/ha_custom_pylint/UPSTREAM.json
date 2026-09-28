@@ -1,6 +1,6 @@
 {
-  "core_tag": "2026.9.0",
-  "source": "https://github.com/home-assistant/core/tree/2026.9.0/pylint/plugins/pylint_home_assistant",
+  "core_tag": "2026.9.4",
+  "source": "https://github.com/home-assistant/core/tree/2026.9.4/pylint/plugins/pylint_home_assistant",
   "carried": {
     "C7401": {
       "symbol": "home-assistant-logger-period",
@@ -338,7 +338,7 @@
     "checkers/type_hints/validators.py": "be4516b3f3d2c17e48a6424bb8341ed7daadc1d85f093b848a4f2745a337afb3",
     "const.py": "60163a3c2db509d5a484ae71a3dd044893c7e60255aeae7273c183fe3658c06d",
     "generated/__init__.py": "e96f3268a51dab61ce02ca26351014631c80bdb186aada1b4f7bae61ad83459e",
-    "generated/mdi_icons.py": "0ef9ae8aa1c07174acf55551bd88f71c1835091111c667e2a4e3acaf979082a9",
+    "generated/mdi_icons.py": "c7e944cfa2e7b78c7990ff4f1856c95829cdb57be830b24740e127bbe5805113",
     "helpers/__init__.py": "c2f7cb6034ecc0aa9180f81e1f1d2417b8bec516ba5252272c23795e837ef9ef",
     "helpers/ast_utils.py": "f7d7367b0e7b3868e7fcaa3d3ca7afa23c45e384fbb5763ef08fb6d8c81d1a6a",
     "helpers/datetime_now.py": "880dedab4fb07a408ceb6ccc89eca4698fc0de8717855a7db332f469d7d84467",

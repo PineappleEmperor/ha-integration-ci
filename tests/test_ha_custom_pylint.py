@@ -685,7 +685,7 @@ def _ids(messages: list[dict]) -> set[str]:
 
 
 def test_the_carried_set_is_the_whole_plugin_but_the_skipped() -> None:
-    """63 carried, C7404 skipped: the 64 messages core's plugin defines at 2026.9.0."""
+    """63 carried, C7404 skipped: the 64 messages core's plugin defines at the tag."""
     assert len(CARRIED) == 63
     assert set(_UPSTREAM["skipped"]) == {"C7404"}
     assert set(CARRIED) >= _TESTS_SIDE

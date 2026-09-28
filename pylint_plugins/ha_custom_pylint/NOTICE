@@ -3,9 +3,10 @@ Copyright the Home Assistant authors.
 
 This package is derived from home-assistant/core pylint/plugins at 2026.9.0
 (https://github.com/home-assistant/core/tree/2026.9.0/pylint/plugins/pylint_home_assistant),
-licensed under the Apache License, Version 2.0. A copy of the licence is in
-LICENSE.md beside this file. UPSTREAM.json records, for every message this
-package carries, the core file it came from and that file's sha256 at the tag.
+and synced since to the core tag UPSTREAM.json records. It is licensed under
+the Apache License, Version 2.0. A copy of the licence is in LICENSE.md beside
+this file. UPSTREAM.json records, for every message this package carries, the
+core file it came from and that file's sha256 at the tag.
 
 What we changed
 ===============

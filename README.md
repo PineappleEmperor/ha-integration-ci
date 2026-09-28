@@ -62,7 +62,8 @@ step runs against the consumer's own checkout.
   wrong. Other modules carry no threshold here, as core's patch target does not bind them.
   pytest-cov arrives with the pinned test harness.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
-  in core's `pylint/plugins` at 2026.9.0, under Apache-2.0 with its `NOTICE`. Core's
+  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
+  consumers test against, under Apache-2.0 with its `NOTICE`. Core's
   plugin decides what an integration is by the module name `homeassistant.components.<domain>`,
   which a custom integration never has, so run as published it stays silent on most of
   one, and its README says it is not for external use. The copy keeps core's checkers,
@@ -84,7 +85,7 @@ step runs against the consumer's own checkout.
   give each new id an entry under `carried` or `skipped`, with a reason, in
   `UPSTREAM.json`, then run it again with `--write` to record the tag and its hashes;
   `--write` refuses while an id is untriaged. The set is every message core defines at
-  2026.9.0 but one:
+  2026.9.4 but one:
 
   | Id | Symbol | Status |
   |---|---|---|
