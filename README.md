@@ -37,7 +37,9 @@ step runs against the consumer's own checkout.
   newer tool reports errors core has not met yet. A repository without
   `requirements.test.txt` gets `homeassistant` pinned to 2026.9.4 too, so pylint's
   inference runs against the release the pylint rules come from rather than the newest
-  one; a repository with it gets the release its pinned test harness brings. The prek
+  one; a repository with it installs that file alone and gets the release its test
+  harness brings, which for a harness left unpinned is whatever the newest harness
+  pins; What the audit checks now says what the audit makes of an unpinned harness. The prek
   action installs the latest prek unless its `prek-version` names one, so the step names
   core's. Dependabot reads neither a `run:` line nor an action input, so the pins move by
   hand: the tools' when core's `requirements_test.txt` and

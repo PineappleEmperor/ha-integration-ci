@@ -71,14 +71,19 @@ def test_install_pins_homeassistant_without_test_requirements(
 def test_install_takes_homeassistant_from_test_requirements(
     tmp_path: pathlib.Path,
 ) -> None:
-    """The pinned test harness decides the release when the repository has one."""
+    """The test harness decides the release when the repository has one.
+
+    The harness pins the homeassistant it was built against and brings it, so
+    no separate homeassistant is asked for beside it.
+    """
     (tmp_path / "requirements.test.txt").write_text(
         "pytest-homeassistant-custom-component==0.13.367\n"
     )
     result, calls = _run_step("Install", tmp_path, ["uv"])
     assert result.returncode == 0, result.stderr
     assert any("-r requirements.test.txt" in call for call in calls)
-    assert not any("homeassistant==" in call for call in calls)
+    installed = " ".join(calls).split()
+    assert not any(arg.startswith("homeassistant") for arg in installed)
 
 
 def _repo(root: pathlib.Path, *files: str) -> pathlib.Path:
