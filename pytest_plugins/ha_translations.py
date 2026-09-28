@@ -131,7 +131,8 @@ async def _validate_translation(
 
     translation_errors[full_key] = (
         f"Translation not found for {component}: `{category}.{key}`. "
-        f"Please add to custom_components/{component}/translations/en.json"
+        f"Please add to custom_components/{component}/strings.json and "
+        "translations/en.json"
     )
 
 

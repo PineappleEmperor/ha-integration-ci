@@ -220,7 +220,7 @@ def test_a_missing_error_message_fails(tmp_path) -> None:
     out = _run(tmp_path, _translations(cannot_connect=True), "todo")
     assert out.startswith("rc=1"), out
     assert "`config.error.cannot_connect`" in out
-    assert "custom_components/sample/translations/en.json" in out
+    assert "custom_components/sample/strings.json and translations/en.json" in out
 
 
 def test_a_field_description_is_required_once_config_flow_is_done(tmp_path) -> None:

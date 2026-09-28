@@ -50,7 +50,8 @@ step runs against the consumer's own checkout.
   from the `quality_scale.yaml` beside the loaded integration rather than at a core path;
   the `exception-translations` rule is read from the `quality_scale.yaml` of the
   repository's one integration, where core keys it on the test's own path; the message
-  names `translations/en.json`; and a service a test registers is recognised by the
+  names both `strings.json` and `translations/en.json`, which the audit holds equal; and
+  a service a test registers is recognised by the
   consumer's own `tests/` directory. It keeps core's `ignore_missing_translations` and
   `ignore_translations_for_mock_domains` fixtures for a test to override. python-validate
   checks this repository out at `github.job_workflow_sha`, as quality-audit does, and loads
