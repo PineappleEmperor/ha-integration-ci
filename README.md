@@ -385,9 +385,11 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   repository without the skill's `.pre-commit-config.yaml` adds it, with the `.yamllint`,
   `.prettierrc.js` and `.prettierignore` it reads; `translations/en.json` becomes an exact
   copy of `strings.json` with every `[%key:…%]` written out; the tests reach every line of
-  `config_flow.py` and `diagnostics.py`; every message the tests make a flow, repair
-  issue or action show has its text in `translations/en.json`; and the integration and
-  its tests pass the pylint rules.
+  each module the coverage gate holds, `config_flow.py` and `diagnostics.py` among them;
+  every message the tests make a flow, repair issue or action show has its text in
+  `translations/en.json`, as does a `data_description` for every flow field once
+  `config-flow` is `done`, and a `name` and `description` for every action the
+  integration registers; and the integration and its tests pass the pylint rules.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
