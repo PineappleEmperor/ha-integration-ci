@@ -1,5 +1,6 @@
 """Unit tests for scripts/pylint_upstream.py, against a fake core tree. No network."""
 
+from collections.abc import Callable
 import http.client
 import importlib.util
 import io
@@ -327,6 +328,15 @@ def _unreachable() -> io.BytesIO:
     raise urllib.error.URLError(OSError(101, "Network is unreachable"))
 
 
+def _http_error(code: int) -> Callable[[], io.BytesIO]:
+    """A failure that is codeload answering HTTP *code*."""
+
+    def fail() -> io.BytesIO:
+        raise urllib.error.HTTPError(upstream.TARBALL_URL, code, "status", None, None)
+
+    return fail
+
+
 @pytest.mark.parametrize(
     "failure",
     [
@@ -335,6 +345,8 @@ def _unreachable() -> io.BytesIO:
         pytest.param(_connection_reset, id="connection_reset"),
         pytest.param(_read_timeout, id="read_timeout"),
         pytest.param(_unreachable, id="url_error"),
+        pytest.param(_http_error(429), id="http_429"),
+        pytest.param(_http_error(503), id="http_503"),
     ],
 )
 def test_a_failed_download_is_retried(monkeypatch, failure) -> None:
@@ -381,13 +393,21 @@ def test_a_download_that_keeps_failing_ends_in_one_line(
     assert "9.9.9" in lines[0] and "3 attempts" in lines[0]
 
 
-def test_an_http_error_is_not_retried(tmp_path, monkeypatch, capsys) -> None:
-    """A 404 for a mistyped tag answers the same every time: one try, and why."""
+@pytest.mark.parametrize(
+    ("code", "tag_named"), [pytest.param(404, True), pytest.param(403, False)]
+)
+def test_a_client_http_error_is_not_retried(
+    tmp_path, monkeypatch, capsys, code, tag_named
+) -> None:
+    """A 4xx other than 429 answers the same every time: one try, and why.
+
+    Only a 404 blames the tag; any other status is reported as it came.
+    """
     attempts: list[str] = []
 
     def fake_open(url: str) -> io.BytesIO:
         attempts.append(url)
-        raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        raise urllib.error.HTTPError(url, code, "status", None, None)
 
     monkeypatch.setattr(upstream, "_open_url", fake_open)
     monkeypatch.setattr(upstream, "_sleep", lambda _: None)
@@ -402,8 +422,8 @@ def test_an_http_error_is_not_retried(tmp_path, monkeypatch, capsys) -> None:
     lines = (captured.out + captured.err).strip().splitlines()
     assert len(attempts) == 1
     assert len(lines) == 1, lines
-    assert "HTTP 404" in lines[0]
-    assert "2026.13.0 may not exist" in lines[0]
+    assert f"HTTP {code}" in lines[0]
+    assert ("2026.13.0 may not exist" in lines[0]) is tag_named
     assert "try again" not in lines[0]
 
 

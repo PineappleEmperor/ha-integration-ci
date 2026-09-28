@@ -112,9 +112,10 @@ class DownloadError(Exception):
 def download_plugin_files(tag: str) -> dict[str, bytes]:
     """Download core's tarball at *tag* and return the plugin's Python files.
 
-    codeload drops a stream now and then, so a dropped or truncated read is
-    retried, with a short backoff, up to ATTEMPTS times in all. An HTTP error
-    status is not retried, since codeload would answer the same again.
+    codeload drops a stream now and then, so a dropped or truncated read, a 429
+    and a 5xx are retried, with a short backoff, up to ATTEMPTS times in all.
+    Any other HTTP error status fails at once, since codeload would answer the
+    same again; a 404 says the tag may not exist.
     """
     url = TARBALL_URL.format(tag=tag)
     error: Exception | None = None
@@ -125,12 +126,18 @@ def download_plugin_files(tag: str) -> dict[str, bytes]:
             with _open_url(url) as response:
                 return plugin_files_from_tarball(response)
         except urllib.error.HTTPError as err:
+            if err.code == 429 or err.code >= 500:
+                # Rate limited or a fault on codeload's side: it may pass.
+                error = err
+                continue
             # codeload answered; asking again gets the same answer.
-            msg = (
-                f"codeload answered HTTP {err.code} for core {tag}; the tag {tag} "
-                "may not exist, so check it against core's releases."
-            )
-            raise DownloadError(msg) from err
+            msg = f"codeload answered HTTP {err.code} for core {tag}"
+            if err.code == 404:
+                msg += (
+                    f"; the tag {tag} may not exist, so check it against core's "
+                    "releases"
+                )
+            raise DownloadError(f"{msg}.") from err
         except RETRIED as err:
             error = err
     msg = (
