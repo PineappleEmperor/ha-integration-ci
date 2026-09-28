@@ -76,13 +76,7 @@ step runs against the consumer's own checkout.
   which a custom integration never has, so run as published it stays silent on most of
   one, and its README says it is not for external use. The copy keeps core's checkers,
   message ids and symbols, so a diff against core stays readable, and changes only what
-  `NOTICE` lists file by file: the name gate also accepts `custom_components.<domain>` and
-  the bare `<domain>` pylint uses when it lints `custom_components/<domain>` from the
-  repository root, where a `manifest.json` beside it confirms the integration; a
-  repo-root `tests/` owns the one integration beside it; W7418, W7420, W7421, W7422 and
-  W7426 match a called name on the import that binds it, so an alias no longer evades
-  them; and R7403 reads
-  `tests/conftest.py` and the root `conftest.py`. python-validate runs it after the
+  `NOTICE` lists. python-validate runs it after the
   checkout, with every other pylint check off, and fails on any hit. The ids it enables
   come from `UPSTREAM.json`, which records for each one the core file it came from and
   that file's sha256 at the tag. R7402 is on although core's own config disables it while
