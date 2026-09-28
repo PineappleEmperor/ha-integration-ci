@@ -56,11 +56,13 @@ step runs against the consumer's own checkout.
   lints it. A local run gets the same check with
   `PYTHONPATH=<a clone of this repository>/pytest_plugins pytest -p ha_translations`.
 - **The coverage gate** is `scripts/coverage_gate.py`, run on the JSON report pytest-cov
-  writes. It fails any line of `config_flow.py` or `diagnostics.py` that no test ran, and
-  either module no test imported: those are the modules core's `codecov.yml` holds to 100%,
-  since the setup screens and the support dump are what a user meets when something is
-  wrong. Other modules carry no threshold here, as core's patch target does not bind them.
-  pytest-cov arrives with the pinned test harness.
+  writes. Core's `codecov.yml` gives twelve module kinds, the script's `FULL` list from
+  `backup.py` to `scene.py` with `config_flow.py` and `diagnostics.py` among them, a 100%
+  patch target: every line a change touches must run. A custom repository has no codecov
+  patch view, so the gate holds those modules to a stricter bar than core's: every line of
+  the whole file. It fails any line of one that no test ran, and any of them no test
+  imported. Other modules carry no threshold here. pytest-cov arrives with the pinned
+  test harness.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
   in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
   consumers test against, under Apache-2.0 with its `NOTICE`. Core's

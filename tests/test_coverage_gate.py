@@ -4,6 +4,8 @@ import importlib.util
 import json
 import pathlib
 
+import pytest
+
 _SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / "scripts"
 _SPEC = importlib.util.spec_from_file_location(
     "coverage_gate", _SCRIPTS / "coverage_gate.py"
@@ -52,6 +54,30 @@ def test_a_module_no_test_imported_fails(tmp_path) -> None:
     root = _repo(tmp_path, "diagnostics.py")
     found = gate.problems(root, _report())
     assert len(found) == 1 and "diagnostics.py" in found[0] and "never" in found[0]
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "backup.py",
+        "config_flow.py",
+        "device_action.py",
+        "device_condition.py",
+        "device_trigger.py",
+        "diagnostics.py",
+        "group.py",
+        "intent.py",
+        "logbook.py",
+        "media_source.py",
+        "recorder.py",
+        "scene.py",
+    ],
+)
+def test_each_module_kind_cores_codecov_names_is_held(tmp_path, module) -> None:
+    """Core's codecov.yml holds these twelve kinds to 100%; a miss in any one fails."""
+    root = _repo(tmp_path, module)
+    found = gate.problems(root, _report(**{module.removesuffix(".py"): [7]}))
+    assert len(found) == 1 and module in found[0]
 
 
 def test_other_modules_are_not_held_to_the_bar(tmp_path) -> None:

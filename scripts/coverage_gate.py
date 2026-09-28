@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Hold the modules core holds to full coverage to the same bar.
+"""Hold the module kinds core's codecov.yml singles out to full coverage.
 
-Reads the coverage.py JSON report pytest-cov wrote for the consumer's suite and fails
-when any line of a config flow or of diagnostics did not run. Exit 1 on any failure.
-README.md says why these modules and how python-validate.yml runs it.
+Core's codecov.yml gives twelve module kinds a 100% patch target: every changed line
+must run. A custom repository has no codecov patch view, so this holds those modules
+to the stricter bar of every line, whole-file. It reads the coverage.py JSON report
+pytest-cov wrote for the consumer's suite and fails when any line of one of them did
+not run. Exit 1 on any failure. README.md says how python-validate.yml runs it.
 """
 
 import argparse
@@ -11,8 +13,21 @@ import json
 import pathlib
 import sys
 
-# The modules core's codecov.yml holds to a 100% target.
-FULL = ("config_flow.py", "diagnostics.py")
+# The module kinds core's codecov.yml gives a 100% patch target.
+FULL = (
+    "backup.py",
+    "config_flow.py",
+    "device_action.py",
+    "device_condition.py",
+    "device_trigger.py",
+    "diagnostics.py",
+    "group.py",
+    "intent.py",
+    "logbook.py",
+    "media_source.py",
+    "recorder.py",
+    "scene.py",
+)
 
 
 def _key(path: str, root: pathlib.Path) -> str:
@@ -59,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     for f in found:
         print(f"❌ FAIL: {f}")
     if not found:
-        print("✅ config flow and diagnostics fully covered")
+        print("✅ every module held to full coverage is fully covered")
     return 1 if found else 0
 
 
