@@ -87,7 +87,8 @@ step runs against the consumer's own checkout.
   or removed; it exits 1 when anything did. Port each named file's change into the copy,
   give each new id an entry under `carried` or `skipped`, with a reason, in
   `UPSTREAM.json`, then run it again with `--write` to record the tag and its hashes;
-  `--write` refuses while an id is untriaged. `UPSTREAM.json` is the list of which of
+  `--write` refuses while an id is untriaged or a recorded support file has vanished,
+  and says what to do about each. `UPSTREAM.json` is the list of which of
   core's messages the copy carries and which it skips, with the reason for each skip.
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through

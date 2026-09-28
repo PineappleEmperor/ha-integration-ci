@@ -181,6 +181,17 @@ def test_write_refuses_while_an_id_is_untriaged(tmp_path, capsys) -> None:
     assert path.read_text() == before
 
 
+def test_write_refuses_while_a_support_file_vanished(tmp_path, capsys) -> None:
+    """A helper core deleted cannot be hashed; --write says what to do instead."""
+    path = _recorded(tmp_path, capsys)
+    before = path.read_text()
+    assert _run(path, _core(tmp_path / "gone", helpers__h=None), "--write") == 1
+    out = capsys.readouterr().out
+    assert "vanished: helpers/h.py" in out
+    assert "delete the file from the copy and its entry from support_files" in out
+    assert path.read_text() == before
+
+
 def test_a_triaged_new_id_is_recorded_by_write(tmp_path, capsys) -> None:
     """Added to carried as {}, a new id is unrecorded until --write fills it in."""
     path = _recorded(tmp_path, capsys)

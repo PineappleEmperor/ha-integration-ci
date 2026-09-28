@@ -11,7 +11,8 @@ other core file the copy carries. Given a newer core tag, this reports:
 
 Exit 1 when anything changed, 0 when nothing did. ``--write`` records the tag
 and its hashes once the changes are ported; it refuses while an added or removed
-id is still untriaged in UPSTREAM.json.
+id is still untriaged in UPSTREAM.json, or a recorded support file has vanished,
+and says what to do about each.
 """
 
 import argparse
@@ -32,6 +33,17 @@ TARBALL_URL = "https://codeload.github.com/home-assistant/core/tar.gz/refs/tags/
 ATTEMPTS = 3
 RETRIED = (http.client.IncompleteRead, tarfile.ReadError, urllib.error.URLError)
 _sleep = time.sleep  # a seam for the tests
+# What --write refuses to record over, by the report line's kind, and the fix.
+UNTRIAGED = {
+    "added in core, untriaged": (
+        "give the id an entry under carried, or under skipped with a reason"
+    ),
+    "removed from core": "port core's removal and drop the id from carried or skipped",
+    "vanished": (
+        "port core's removal: delete the file from the copy and its entry "
+        "from support_files"
+    ),
+}
 DEFAULT_UPSTREAM = (
     Path(__file__).resolve().parents[1]
     / "pylint_plugins"
@@ -240,10 +252,15 @@ def main(argv: list[str] | None = None) -> int:
     problems = compare(upstream, files)
 
     if args.write:
-        untriaged = [line for line in problems if "core" in line.split(":")[0]]
+        untriaged = [line for line in problems if line.split(":")[0] in UNTRIAGED]
         if untriaged:
-            print("Triage these in UPSTREAM.json before --write:")
-            print("\n".join(f"  {line}" for line in untriaged))
+            print("Resolve these before --write:")
+            print(
+                "\n".join(
+                    f"  {line}\n    {UNTRIAGED[line.split(':')[0]]}"
+                    for line in untriaged
+                )
+            )
             return 1
         record = updated(upstream, files, args.tag)
         args.upstream.write_text(json.dumps(record, indent=2) + "\n")
