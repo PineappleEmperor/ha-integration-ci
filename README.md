@@ -31,12 +31,13 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
-  Ruff, mypy and pylint are pinned to 0.16.3, 2.3.1 and 4.0.7, with pylint's astroid at
-  4.0.4, the versions Home Assistant core 2026.9.0 pins, because the consumer's rule set,
-  `mypy.ini` and pylint rules are derived from core's and a newer tool reports errors
-  core has not met yet. Dependabot does not read a
-  `run:` line, so the pins move by hand when core's `requirements_test.txt` and
-  `requirements_test_pre_commit.txt` move them. Pytest's `--timeout=9` is core's per-test
+  Ruff, mypy, pylint and prek are pinned to 0.16.3, 2.3.1, 4.0.7 and 0.2.28, with
+  pylint's astroid at 4.0.4, the versions Home Assistant core 2026.9.4 pins, because the
+  consumer's rule set, `mypy.ini`, pylint rules and hooks are derived from core's and a
+  newer tool reports errors core has not met yet. The prek action installs the latest
+  prek unless its `prek-version` names one, so the step names core's. Dependabot reads
+  neither a `run:` line nor an action input, so the pins move by hand when core's
+  `requirements_test.txt` and `requirements_test_pre_commit.txt` move them. Pytest's `--timeout=9` is core's per-test
   limit, so a hung test fails in seconds rather than at the job timeout; the flag comes
   from `pytest-timeout`, which the pinned test harness brings. The job
   name says what the job is for rather than which tools it runs, because it is half of

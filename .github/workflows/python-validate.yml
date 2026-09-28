@@ -42,6 +42,8 @@ jobs:
       - name: Pre-commit hooks
         if: hashFiles('.pre-commit-config.yaml') != ''
         uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
+        with:
+          prek-version: 0.2.28
         env:
           PREK_SKIP: no-commit-to-branch,ruff-check,ruff-format
 
