@@ -76,8 +76,15 @@ step runs against the consumer's own checkout.
   checkout, with every other pylint check off, and fails on any hit. The ids it enables
   come from `UPSTREAM.json`, which records for each one the core file it came from and
   that file's sha256 at the tag. R7402 is on although core's own config disables it while
-  core clears old violations, since a new repository has none. The set is every message
-  core defines at 2026.9.0 but one:
+  core clears old violations, since a new repository has none. On each core release,
+  `python scripts/pylint_upstream.py --tag <core tag>` downloads core's plugin at that tag
+  and names every carried message whose core file changed, moved or vanished, every other
+  core file the copy carries that changed or vanished, and every message id core added
+  or removed; it exits 1 when anything did. Port each named file's change into the copy,
+  give each new id an entry under `carried` or `skipped`, with a reason, in
+  `UPSTREAM.json`, then run it again with `--write` to record the tag and its hashes;
+  `--write` refuses while an id is untriaged. The set is every message core defines at
+  2026.9.0 but one:
 
   | Id | Symbol | Status |
   |---|---|---|
