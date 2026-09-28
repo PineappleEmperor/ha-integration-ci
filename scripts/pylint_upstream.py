@@ -102,14 +102,15 @@ def plugin_files_from_tarball(stream: IO[bytes]) -> dict[str, bytes]:
 
 
 class DownloadError(Exception):
-    """Core's tarball could not be read, after every attempt."""
+    """Core's tarball could not be read: codeload refused it, or every attempt failed."""
 
 
 def download_plugin_files(tag: str) -> dict[str, bytes]:
     """Download core's tarball at *tag* and return the plugin's Python files.
 
     codeload drops a stream now and then, so a dropped or truncated read is
-    retried, with a short backoff, up to ATTEMPTS times in all.
+    retried, with a short backoff, up to ATTEMPTS times in all. An HTTP error
+    status is not retried, since codeload would answer the same again.
     """
     url = TARBALL_URL.format(tag=tag)
     error: Exception | None = None
@@ -119,6 +120,13 @@ def download_plugin_files(tag: str) -> dict[str, bytes]:
         try:
             with _open_url(url) as response:
                 return plugin_files_from_tarball(response)
+        except urllib.error.HTTPError as err:
+            # codeload answered; asking again gets the same answer.
+            msg = (
+                f"codeload answered HTTP {err.code} for core {tag}; the tag {tag} "
+                "may not exist, so check it against core's releases."
+            )
+            raise DownloadError(msg) from err
         except RETRIED as err:
             error = err
     msg = (

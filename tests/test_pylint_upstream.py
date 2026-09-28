@@ -342,6 +342,32 @@ def test_a_download_that_keeps_failing_ends_in_one_line(
     assert "9.9.9" in lines[0] and "3 attempts" in lines[0]
 
 
+def test_an_http_error_is_not_retried(tmp_path, monkeypatch, capsys) -> None:
+    """A 404 for a mistyped tag answers the same every time: one try, and why."""
+    attempts: list[str] = []
+
+    def fake_open(url: str) -> io.BytesIO:
+        attempts.append(url)
+        raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+
+    monkeypatch.setattr(upstream, "_open_url", fake_open)
+    monkeypatch.setattr(upstream, "_sleep", lambda _: None)
+    path = tmp_path / "UPSTREAM.json"
+    path.write_text(
+        json.dumps(
+            {"core_tag": "1.0.0", "carried": {}, "skipped": {}, "support_files": {}}
+        )
+    )
+    assert upstream.main(["--tag", "2026.13.0", "--upstream", str(path)]) == 1
+    captured = capsys.readouterr()
+    lines = (captured.out + captured.err).strip().splitlines()
+    assert len(attempts) == 1
+    assert len(lines) == 1, lines
+    assert "HTTP 404" in lines[0]
+    assert "2026.13.0 may not exist" in lines[0]
+    assert "try again" not in lines[0]
+
+
 def test_the_recorded_copy_matches_its_own_package() -> None:
     """UPSTREAM.json names every file our copy carries, and only those."""
     record = json.loads(upstream.DEFAULT_UPSTREAM.read_text())
