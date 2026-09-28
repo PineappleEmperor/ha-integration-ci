@@ -164,9 +164,9 @@ step runs against the consumer's own checkout.
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
-  are the consumer's `.pre-commit-config.yaml` — codespell, `check-json`, yamllint and the
-  JSON-sorting prettier — so a typo in `strings.json` or an unsorted manifest fails here
-  and not first in review. `PREK_SKIP` drops `no-commit-to-branch`, which would fail every
+  are the consumer's `.pre-commit-config.yaml` hooks — the ha-integration skill's template
+  lists them — so a misspelt word in the Python, or a `strings.json` whose keys are out of
+  order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`, which would fail every
   push to `main` as core's CI also skips it, and the two ruff hooks, which the pinned ruff
   step already runs.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
