@@ -265,8 +265,27 @@ def _truncated_tarball() -> io.BytesIO:
     return io.BytesIO(_GOOD_TARBALL[: len(_GOOD_TARBALL) // 2])
 
 
+class _FailingStream(io.BytesIO):
+    """A response whose body read raises *error*, as a dropped socket does."""
+
+    def __init__(self, error: OSError) -> None:
+        super().__init__(_GOOD_TARBALL)
+        self.error = error
+
+    def read(self, size: int | None = -1) -> bytes:
+        raise self.error
+
+
 def _connection_reset() -> io.BytesIO:
-    raise urllib.error.URLError("connection reset")
+    return _FailingStream(ConnectionResetError(104, "Connection reset by peer"))
+
+
+def _read_timeout() -> io.BytesIO:
+    return _FailingStream(TimeoutError("The read operation timed out"))
+
+
+def _unreachable() -> io.BytesIO:
+    raise urllib.error.URLError(OSError(101, "Network is unreachable"))
 
 
 @pytest.mark.parametrize(
@@ -274,7 +293,9 @@ def _connection_reset() -> io.BytesIO:
     [
         pytest.param(_incomplete_read, id="incomplete_read"),
         pytest.param(_truncated_tarball, id="truncated_tarball"),
-        pytest.param(_connection_reset, id="url_error"),
+        pytest.param(_connection_reset, id="connection_reset"),
+        pytest.param(_read_timeout, id="read_timeout"),
+        pytest.param(_unreachable, id="url_error"),
     ],
 )
 def test_a_failed_download_is_retried(monkeypatch, failure) -> None:
