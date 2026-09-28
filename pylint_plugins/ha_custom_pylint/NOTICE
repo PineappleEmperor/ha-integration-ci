@@ -37,7 +37,11 @@ package is taken to test the one integration in custom_components/.
                                          integration is treated as core treats
                                          tests.components.<domain> (no C7405 or C7407);
                                          C7404 counts the segments above the domain
-                                         in each spelling, where core assumes two.
+                                         in each spelling, where core assumes two:
+                                         one in custom_components.<domain>, and
+                                         none in the bare <domain> or in a
+                                         repo-root tests package, which is its
+                                         own root.
   checkers/actions/swallowed_exceptions.py
                                          a decorator defined in the integration's own
                                          modules is inspected, as core inspects those
