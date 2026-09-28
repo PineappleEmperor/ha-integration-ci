@@ -313,7 +313,7 @@ of it, not a substitute.
   `done` or `exempt`, manifest honesty (`integration_type`,
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
-  `*.spec.ts`, a `translations/en.json` that is not `strings.json` key for key or that
+  `*.spec.ts`, a `translations/en.json` that is not `strings.json` leaf for leaf or that
   carries a `[%key:…%]` reference (Home Assistant serves `en.json` as written, and only core
   resolves those references, at build time), the root `conftest.py`,
   `asyncio_mode = "auto"`, the pinned test harness (a
