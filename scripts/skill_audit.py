@@ -266,6 +266,10 @@ def check_canonical_files(repo: Repo) -> Result:
         (".github/release-drafter.yml", ""),
         (".github/dependabot.yml", ""),
         (".gitignore", ""),
+        (
+            ".pre-commit-config.yaml",
+            " (python-validate runs its hooks in CI only when it exists)",
+        ),
     ):
         if not repo.exists(f):
             fails.append(f"missing {f}{why}")

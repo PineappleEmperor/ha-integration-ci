@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -60,6 +60,14 @@ step runs against the consumer's own checkout.
   since the setup screens and the support dump are what a user meets when something is
   wrong. Other modules carry no threshold here, as core's patch target does not bind them.
   pytest-cov arrives with the pinned test harness.
+- **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
+  is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
+  `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
+  are the consumer's `.pre-commit-config.yaml` — codespell, `check-json`, yamllint and the
+  JSON-sorting prettier — so a typo in `strings.json` or an unsorted manifest fails here
+  and not first in review. `PREK_SKIP` drops `no-commit-to-branch`, which would fail every
+  push to `main` as core's CI also skips it, and the two ruff hooks, which the pinned ruff
+  step already runs.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
@@ -171,7 +179,8 @@ of it, not a substitute.
 - **The callers.** `check_canonical_files` requires `pr-checks.yml`, `lint-pr.yml`,
   `python-validate.yml`, `quality-audit.yml`, `dependency-review.yml` and
   `release-drafter.yml` in every repo, with `.github/release-drafter.yml`,
-  `.github/dependabot.yml` and `.gitignore` beside them; `hacs-validate.yml`,
+  `.github/dependabot.yml`, `.gitignore` and `.pre-commit-config.yaml` beside them;
+  `hacs-validate.yml`,
   `hassfest-validate.yml` and `release.yml` in an integration; `panel-bundle.yml` once
   `frontend/package.json` exists; and refuses the superseded `frontend_build.yml`.
   `check_callers` requires each caller's `uses:` to name the repository and workflow
@@ -270,7 +279,12 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   name is never reported again and the bump PR waits on it forever; a `mypy.ini` joins
   the repository root, derived from core's; `pyrightconfig.json` goes. Core's
   `mypy.ini` disables `import-untyped` and fails an unused ignore, so a
-  `# type: ignore[import-untyped]` the old audit asked for now fails and goes too.
+  `# type: ignore[import-untyped]` the old audit asked for now fails and goes too. A
+  repository without the skill's `.pre-commit-config.yaml` adds it, with the `.yamllint`,
+  `.prettierrc.js` and `.prettierignore` it reads; `translations/en.json` becomes an exact
+  copy of `strings.json` with every `[%key:…%]` written out; the tests reach every line of
+  `config_flow.py` and `diagnostics.py`; and every message the tests make a flow, repair
+  issue or action show has its text in `translations/en.json`.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That

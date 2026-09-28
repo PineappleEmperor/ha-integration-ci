@@ -42,6 +42,7 @@ def test_missing_canonical_workflows_are_listed(repo) -> None:
     assert any("python-validate.yml" in f for f in fails)
     assert any("dependency-review.yml" in f for f in fails)
     assert any(".gitignore" in f for f in fails)
+    assert any(".pre-commit-config.yaml" in f for f in fails)
 
 
 def test_a_panel_repo_must_carry_the_panel_workflow(repo) -> None:
