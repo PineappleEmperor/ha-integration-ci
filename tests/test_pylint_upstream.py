@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import pathlib
+import ssl
 import tarfile
 import urllib.error
 
@@ -324,6 +325,10 @@ def _read_timeout() -> io.BytesIO:
     return _FailingStream(TimeoutError("The read operation timed out"))
 
 
+def _tls_eof() -> io.BytesIO:
+    return _FailingStream(ssl.SSLEOFError(8, "EOF occurred in violation of protocol"))
+
+
 def _unreachable() -> io.BytesIO:
     raise urllib.error.URLError(OSError(101, "Network is unreachable"))
 
@@ -344,6 +349,7 @@ def _http_error(code: int) -> Callable[[], io.BytesIO]:
         pytest.param(_truncated_tarball, id="truncated_tarball"),
         pytest.param(_connection_reset, id="connection_reset"),
         pytest.param(_read_timeout, id="read_timeout"),
+        pytest.param(_tls_eof, id="tls_eof"),
         pytest.param(_unreachable, id="url_error"),
         pytest.param(_http_error(429), id="http_429"),
         pytest.param(_http_error(503), id="http_503"),

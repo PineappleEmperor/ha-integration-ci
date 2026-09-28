@@ -24,6 +24,7 @@ import hashlib
 import http.client
 import json
 from pathlib import Path, PurePosixPath
+import ssl
 import sys
 import tarfile
 import time
@@ -34,13 +35,15 @@ import urllib.request
 PLUGIN_PATH = "pylint/plugins/pylint_home_assistant"
 TARBALL_URL = "https://codeload.github.com/home-assistant/core/tar.gz/refs/tags/{tag}"
 ATTEMPTS = 3
-# A reset or timeout mid-read raises the bare OSError, not a URLError around it.
+# urlopen wraps a failure while connecting in a URLError; a reset, timeout or
+# TLS failure mid-read raises its own OSError subclass, with nothing around it.
 RETRIED = (
     http.client.IncompleteRead,
     tarfile.ReadError,
     urllib.error.URLError,
     ConnectionError,
     TimeoutError,
+    ssl.SSLError,
 )
 _sleep = time.sleep  # a seam for the tests
 # What --write refuses to record over, by the report line's kind, and the fix.
