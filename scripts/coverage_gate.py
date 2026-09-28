@@ -69,7 +69,13 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     root = pathlib.Path(args.root)
-    report = json.loads(pathlib.Path(args.report).read_text(encoding="utf-8"))
+    # No tests means no report: every held module present then never ran.
+    report_path = pathlib.Path(args.report)
+    report = (
+        json.loads(report_path.read_text(encoding="utf-8"))
+        if report_path.is_file()
+        else {}
+    )
     found = problems(root, report)
     for f in found:
         print(f"❌ FAIL: {f}")

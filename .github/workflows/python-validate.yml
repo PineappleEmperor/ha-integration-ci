@@ -72,6 +72,7 @@ jobs:
         run: |
           if [ ! -d tests ]; then
             echo "::warning::no tests/ directory - quality_scale rules marked 'done' are unproven"
+            python .ha-integration-ci/scripts/coverage_gate.py --root . --report no-tests.json
           elif [ ! -f requirements.test.txt ]; then
             echo "::error::tests/ exists but requirements.test.txt is missing"
             exit 1

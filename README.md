@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, core's pylint rules on `custom_components/` and on `tests/` when it exists, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, core's pylint rules on `custom_components/` and on `tests/` when it exists, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent, and then fails if a module the coverage gate holds exists; fails when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -61,8 +61,9 @@ step runs against the consumer's own checkout.
   patch target: every line a change touches must run. A custom repository has no codecov
   patch view, so the gate holds those modules to a stricter bar than core's: every line of
   the whole file. It fails any line of one that no test ran, and any of them no test
-  imported. Other modules carry no threshold here. pytest-cov arrives with the pinned
-  test harness.
+  imported. A held module with no tests fails too: without `tests/` python-validate runs
+  the gate on a report that does not exist, which it reads as nothing having run. Other
+  modules carry no threshold here. pytest-cov arrives with the pinned test harness.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
   in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
   consumers test against, under Apache-2.0 with its `NOTICE`. Core's

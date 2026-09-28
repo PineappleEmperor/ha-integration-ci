@@ -96,3 +96,22 @@ def test_main_reads_the_report_and_exits_on_a_miss(tmp_path, capsys) -> None:
 
     report.write_text(json.dumps(_report(config_flow=[])))
     assert gate.main(["--root", str(root), "--report", str(report)]) == 0
+
+
+def test_a_missing_report_fails_every_held_module_as_never_run(
+    tmp_path, capsys
+) -> None:
+    """With no tests there is no report, and a held module present never ran."""
+    root = _repo(tmp_path, "config_flow.py", "sensor.py")
+    absent = tmp_path / "no-report.json"
+    assert gate.main(["--root", str(root), "--report", str(absent)]) == 1
+    out = capsys.readouterr().out
+    assert "config_flow.py never ran" in out
+    assert "sensor.py" not in out
+
+
+def test_a_missing_report_passes_when_nothing_is_held(tmp_path) -> None:
+    """A repository with no held module has nothing to cover."""
+    root = _repo(tmp_path, "sensor.py")
+    absent = tmp_path / "no-report.json"
+    assert gate.main(["--root", str(root), "--report", str(absent)]) == 0
