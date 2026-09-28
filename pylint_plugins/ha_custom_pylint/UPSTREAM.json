@@ -17,6 +17,11 @@
       "file": "checkers/imports.py",
       "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
     },
+    "C7404": {
+      "symbol": "home-assistant-absolute-import",
+      "file": "checkers/imports.py",
+      "sha256": "33330b63910fd493510ec805a52482f95f661e105301c013ca12e7ad49611b27"
+    },
     "C7405": {
       "symbol": "home-assistant-component-root-import",
       "file": "checkers/imports.py",
@@ -318,12 +323,7 @@
       "sha256": "3280ef278d7f34f47403451b61eecc1bace68cb2bac686c1f8b4de13c646a05b"
     }
   },
-  "skipped": {
-    "C7404": {
-      "symbol": "home-assistant-absolute-import",
-      "reason": "ruff TID252 (ban-relative-imports = parents) already bans a relative import that climbs out of the integration"
-    }
-  },
+  "skipped": {},
   "support_files": {
     "__init__.py": "d7302eecd0561f62cf2bd6368730f8fcca8bd572234a89d22d13871dcd1bc6dc",
     "checkers/__init__.py": "9ad7e6613de60c13ca1da7f87792524714ffde49218d558ef18ef78918afeffc",

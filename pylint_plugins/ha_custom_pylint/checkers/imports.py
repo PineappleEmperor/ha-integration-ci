@@ -219,6 +219,7 @@ class HassImportsFormatChecker(BaseChecker):
     current_component: str | None
     custom_own_root: str | None
     custom_test_component: str | None
+    root_segment_count: int
 
     def visit_module(self, node: nodes.Module) -> None:
         """Determine current package."""
@@ -240,6 +241,14 @@ class HassImportsFormatChecker(BaseChecker):
         if parsed_module is None:
             self.custom_test_component = custom_test_domain(node)
             self.current_component = self.custom_test_component
+        # ha_custom_pylint: C7404 counts the segments above the domain, two in
+        # core's names; one in ``custom_components.<domain>``, and none in the
+        # bare ``<domain>`` or in a repo-root ``tests``, which is its own root.
+        self.root_segment_count = 2
+        if self.custom_own_root is not None:
+            self.root_segment_count = int(node.name.startswith("custom_components."))
+        elif self.custom_test_component is not None:
+            self.root_segment_count = 0
 
     def _is_custom_own_import(self, modname: str) -> bool:
         """Return True if *modname* is this custom integration's absolute path."""
@@ -283,14 +292,16 @@ class HassImportsFormatChecker(BaseChecker):
             # No need to check relative import
             return
 
-        if not node.modname and len(split_package) == node.level + 1:
+        # ha_custom_pylint: core's 1 and 2 are its root_segment_count - 1 and 2.
+        root_segments = self.root_segment_count
+        if not node.modname and len(split_package) == node.level + root_segments - 1:
             for name in node.names:
                 # Allow relative import to component root
                 if name[0] != current_component:
                     self.add_message("home-assistant-absolute-import", node=node)
                     return
             return
-        if len(split_package) < node.level + 2:
+        if len(split_package) < node.level + root_segments:
             self.add_message("home-assistant-absolute-import", node=node)
 
     def _check_for_constant_alias(

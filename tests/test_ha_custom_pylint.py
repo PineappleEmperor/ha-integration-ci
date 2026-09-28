@@ -235,6 +235,17 @@ _SAMPLE = {
             """Return the entry's title."""
             return {"title": entry.title}
         ''',
+    "custom_components/sample/api/__init__.py": '"""The sample hub API."""\n',
+    "custom_components/sample/api/hub.py": '''
+        """The sample hub."""
+
+        from ..const import DOMAIN
+
+
+        def hub_name() -> str:
+            """Name the hub after its integration."""
+            return f"{DOMAIN} hub"
+        ''',
 }
 
 _ROOT_CONFTEST = {
@@ -627,6 +638,15 @@ _DIRTY = {
                 except OSError:
                     _LOGGER.error("Failed")
         ''',
+    # The skill's ruff config ignores TID252 in a sub-package; only C7404 sees this.
+    "custom_components/dirty/api/__init__.py": '"""A sub-package."""\n',
+    "custom_components/dirty/api/hub.py": '''
+        """Climbs out of the integration."""
+
+        from ...other.const import THING
+
+        HUB = THING
+        ''',
 }
 
 # Where each carried id is seeded: the integration or the tests.
@@ -693,10 +713,10 @@ def _ids(messages: list[dict]) -> set[str]:
     return {message["message-id"] for message in messages}
 
 
-def test_the_carried_set_is_the_whole_plugin_but_the_skipped() -> None:
-    """63 carried, C7404 skipped: the 64 messages core's plugin defines at the tag."""
-    assert len(CARRIED) == 63
-    assert set(_UPSTREAM["skipped"]) == {"C7404"}
+def test_the_carried_set_is_the_whole_plugin() -> None:
+    """All 64 messages core's plugin defines at the tag are carried."""
+    assert len(CARRIED) == 64
+    assert _UPSTREAM["skipped"] == {}
     assert set(CARRIED) >= _TESTS_SIDE
 
 
@@ -757,6 +777,16 @@ def test_own_integration_imports_in_tests_are_not_root_imports(
 ) -> None:
     """Tests importing their own integration's modules are not C7405 or C7407."""
     assert not _ids(runs["dirty tests"]) & {"C7405", "C7407", "C7408"}
+
+
+def test_a_climb_out_of_a_sub_package_is_caught(runs: dict[str, list[dict]]) -> None:
+    """C7404 fires on dirty/api/hub.py, where ruff's TID252 is off, and only there."""
+    climbs = {
+        (m["module"], m["line"])
+        for m in runs["dirty integration"]
+        if m["message-id"] == "C7404"
+    }
+    assert climbs == {("dirty.api.hub", 3)}
 
 
 # Unit tests, in the shape of core's tests/pylint/.
@@ -866,12 +896,7 @@ def _import_messages(
         checker.visit_import(node)
     else:
         checker.visit_importfrom(node)
-    # C7404 is skipped; imports.py still defines it, so a unit linter sees it.
-    return [
-        message.msg_id
-        for message in linter.release_messages()
-        if message.msg_id != "home-assistant-absolute-import"
-    ]
+    return [message.msg_id for message in linter.release_messages()]
 
 
 _SPELLINGS = pytest.mark.parametrize(
@@ -888,9 +913,11 @@ _SPELLINGS = pytest.mark.parametrize(
         ("sensor", "from custom_components.pylint_testing import CONSTANT"),
         ("sensor", "from .const import CONSTANT"),
         ("sensor", "from . import CONSTANT"),
+        ("sensor", "from .. import pylint_test"),
         ("api.hub", "from homeassistant.const import CONSTANT"),
         ("api.hub", "from ..const import CONSTANT"),
         ("api.hub", "from .. import CONSTANT"),
+        ("api.hub", "from ... import pylint_test"),
         # Ported from core's test_good_root_import.
         ("climate", "from homeassistant.components import climate"),
         (
@@ -937,6 +964,9 @@ def test_good_import(
             "import custom_components.pylint_test.const",
             "home-assistant-relative-import",
         ),
+        ("sensor", "from ..const import CONSTANT", "home-assistant-absolute-import"),
+        ("sensor", "from ...const import CONSTANT", "home-assistant-absolute-import"),
+        ("api.hub", "from ...const import CONSTANT", "home-assistant-absolute-import"),
         # Ported from core's test_bad_root_import.
         (
             "climate",
