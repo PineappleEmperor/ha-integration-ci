@@ -34,10 +34,16 @@ step runs against the consumer's own checkout.
   Ruff, mypy, pylint and prek are pinned to 0.16.3, 2.3.1, 4.0.7 and 0.2.28, with
   pylint's astroid at 4.0.4, the versions Home Assistant core 2026.9.4 pins, because the
   consumer's rule set, `mypy.ini`, pylint rules and hooks are derived from core's and a
-  newer tool reports errors core has not met yet. The prek action installs the latest
-  prek unless its `prek-version` names one, so the step names core's. Dependabot reads
-  neither a `run:` line nor an action input, so the pins move by hand when core's
-  `requirements_test.txt` and `requirements_test_pre_commit.txt` move them. Pytest's
+  newer tool reports errors core has not met yet. A repository without
+  `requirements.test.txt` gets `homeassistant` pinned to 2026.9.4 too, so pylint's
+  inference runs against the release the pylint rules come from rather than the newest
+  one; a repository with it gets the release its pinned test harness brings. The prek
+  action installs the latest prek unless its `prek-version` names one, so the step names
+  core's. Dependabot reads neither a `run:` line nor an action input, so the pins move by
+  hand: the tools' when core's `requirements_test.txt` and
+  `requirements_test_pre_commit.txt` move them, and `homeassistant`'s when the pylint
+  rules are synced to a new core tag, since `tests/test_python_validate.py` holds it to
+  the tag `UPSTREAM.json` records. Pytest's
   `--timeout=9` is core's per-test limit, so a hung test fails in seconds rather than at
   the job timeout; the flag comes from `pytest-timeout`, which the pinned test harness
   brings. The job name says what the job is for rather than which tools it runs, because

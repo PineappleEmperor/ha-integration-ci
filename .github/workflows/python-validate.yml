@@ -27,9 +27,12 @@ jobs:
 
       - name: Install
         run: |
-          uv pip install --system homeassistant ruff==0.16.3 mypy==2.3.1 \
-            pylint==4.0.7 astroid==4.0.4
-          [ -f requirements.test.txt ] && uv pip install --system -r requirements.test.txt || true
+          uv pip install --system ruff==0.16.3 mypy==2.3.1 pylint==4.0.7 astroid==4.0.4
+          if [ -f requirements.test.txt ]; then
+            uv pip install --system homeassistant -r requirements.test.txt
+          else
+            uv pip install --system homeassistant==2026.9.4
+          fi
 
       - name: Ruff
         run: |
