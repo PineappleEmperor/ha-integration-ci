@@ -17,15 +17,21 @@ id is still untriaged in UPSTREAM.json.
 import argparse
 import ast
 import hashlib
+import http.client
 import json
 from pathlib import Path, PurePosixPath
 import sys
 import tarfile
+import time
 from typing import IO, Any
+import urllib.error
 import urllib.request
 
 PLUGIN_PATH = "pylint/plugins/pylint_home_assistant"
 TARBALL_URL = "https://codeload.github.com/home-assistant/core/tar.gz/refs/tags/{tag}"
+ATTEMPTS = 3
+RETRIED = (http.client.IncompleteRead, tarfile.ReadError, urllib.error.URLError)
+_sleep = time.sleep  # a seam for the tests
 DEFAULT_UPSTREAM = (
     Path(__file__).resolve().parents[1]
     / "pylint_plugins"
@@ -76,10 +82,31 @@ def plugin_files_from_tarball(stream: IO[bytes]) -> dict[str, bytes]:
     return files
 
 
+class DownloadError(Exception):
+    """Core's tarball could not be read, after every attempt."""
+
+
 def download_plugin_files(tag: str) -> dict[str, bytes]:
-    """Download core's tarball at *tag* and return the plugin's Python files."""
-    with _open_url(TARBALL_URL.format(tag=tag)) as response:
-        return plugin_files_from_tarball(response)
+    """Download core's tarball at *tag* and return the plugin's Python files.
+
+    codeload drops a stream now and then, so a dropped or truncated read is
+    retried, with a short backoff, up to ATTEMPTS times in all.
+    """
+    url = TARBALL_URL.format(tag=tag)
+    error: Exception | None = None
+    for attempt in range(ATTEMPTS):
+        if attempt:
+            _sleep(2 * attempt)
+        try:
+            with _open_url(url) as response:
+                return plugin_files_from_tarball(response)
+        except RETRIED as err:
+            error = err
+    msg = (
+        f"Could not read core {tag} from codeload after {ATTEMPTS} attempts "
+        f"({type(error).__name__}); try again, or pass --core-dir."
+    )
+    raise DownloadError(msg) from error
 
 
 def messages_in(files: dict[str, bytes]) -> dict[str, tuple[str, str]]:
@@ -201,11 +228,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     upstream = json.loads(args.upstream.read_text())
-    files = (
-        plugin_files_from_dir(args.core_dir)
-        if args.core_dir
-        else download_plugin_files(args.tag)
-    )
+    try:
+        files = (
+            plugin_files_from_dir(args.core_dir)
+            if args.core_dir
+            else download_plugin_files(args.tag)
+        )
+    except DownloadError as err:
+        print(err, file=sys.stderr)
+        return 1
     problems = compare(upstream, files)
 
     if args.write:

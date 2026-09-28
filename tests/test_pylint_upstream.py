@@ -1,10 +1,12 @@
 """Unit tests for scripts/pylint_upstream.py, against a fake core tree. No network."""
 
+import http.client
 import importlib.util
 import io
 import json
 import pathlib
 import tarfile
+import urllib.error
 
 import pytest
 
@@ -237,6 +239,75 @@ def test_a_tarball_without_the_plugin_is_an_error() -> None:
         upstream.plugin_files_from_tarball(
             io.BytesIO(_tarball({"core-1/homeassistant/const.py": "X = 1\n"}))
         )
+
+
+_GOOD_TARBALL = _tarball(
+    {f"core-9.9.9/{upstream.PLUGIN_PATH}/checkers/a.py": _CHECKER_A}
+)
+
+
+def _incomplete_read() -> io.BytesIO:
+    raise http.client.IncompleteRead(b"partial")
+
+
+def _truncated_tarball() -> io.BytesIO:
+    return io.BytesIO(_GOOD_TARBALL[: len(_GOOD_TARBALL) // 2])
+
+
+def _connection_reset() -> io.BytesIO:
+    raise urllib.error.URLError("connection reset")
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        pytest.param(_incomplete_read, id="incomplete_read"),
+        pytest.param(_truncated_tarball, id="truncated_tarball"),
+        pytest.param(_connection_reset, id="url_error"),
+    ],
+)
+def test_a_failed_download_is_retried(monkeypatch, failure) -> None:
+    """Two failed reads then a good one pass: codeload drops the stream now and then."""
+    attempts: list[str] = []
+    waits: list[float] = []
+
+    def fake_open(url: str) -> io.BytesIO:
+        attempts.append(url)
+        return failure() if len(attempts) < 3 else io.BytesIO(_GOOD_TARBALL)
+
+    monkeypatch.setattr(upstream, "_open_url", fake_open)
+    monkeypatch.setattr(upstream, "_sleep", waits.append)
+    assert upstream.download_plugin_files("9.9.9") == {
+        "checkers/a.py": _CHECKER_A.encode()
+    }
+    assert len(attempts) == 3
+    assert len(waits) == 2
+
+
+def test_a_download_that_keeps_failing_ends_in_one_line(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """After the last attempt: exit 1 and one line saying so, not a traceback."""
+    attempts: list[str] = []
+
+    def fake_open(url: str) -> io.BytesIO:
+        attempts.append(url)
+        return _connection_reset()
+
+    monkeypatch.setattr(upstream, "_open_url", fake_open)
+    monkeypatch.setattr(upstream, "_sleep", lambda _: None)
+    path = tmp_path / "UPSTREAM.json"
+    path.write_text(
+        json.dumps(
+            {"core_tag": "1.0.0", "carried": {}, "skipped": {}, "support_files": {}}
+        )
+    )
+    assert upstream.main(["--tag", "9.9.9", "--upstream", str(path)]) == 1
+    captured = capsys.readouterr()
+    lines = (captured.out + captured.err).strip().splitlines()
+    assert len(attempts) == 3
+    assert len(lines) == 1, lines
+    assert "9.9.9" in lines[0] and "3 attempts" in lines[0]
 
 
 def test_the_recorded_copy_matches_its_own_package() -> None:
