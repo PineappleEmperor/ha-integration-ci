@@ -348,5 +348,6 @@
     "helpers/module_info.py": "65d6a6c75c132287e0d22b167bc7db371703b0ac1c30511f71a240d7972ecd68",
     "helpers/quality_scale.py": "dc45d77b0fce3a51a3cb8664c56a8826a7723d608aa590b598ef5366f243e7bd",
     "helpers/translations.py": "51c4721e6dc1f892da005ed3785918f9010a0b2c149c7f989b75fedc578c353f"
-  }
+  },
+  "ignored": {}
 }

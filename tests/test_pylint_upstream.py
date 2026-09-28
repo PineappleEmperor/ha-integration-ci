@@ -192,6 +192,45 @@ def test_write_refuses_while_a_support_file_vanished(tmp_path, capsys) -> None:
     assert path.read_text() == before
 
 
+def test_a_new_core_file_is_reported(tmp_path, capsys) -> None:
+    """A helper core adds is neither carried nor recorded: it is named, not missed."""
+    path = _recorded(tmp_path, capsys)
+    assert _run(path, _core(tmp_path / "new", helpers__new=_HELPER)) == 1
+    assert "new core file: helpers/new.py" in capsys.readouterr().out
+
+
+def test_write_refuses_while_a_new_core_file_is_untriaged(tmp_path, capsys) -> None:
+    """--write cannot pass over a core file nobody decided on."""
+    path = _recorded(tmp_path, capsys)
+    before = path.read_text()
+    assert _run(path, _core(tmp_path / "new", helpers__new=_HELPER), "--write") == 1
+    out = capsys.readouterr().out
+    assert "new core file: helpers/new.py" in out
+    assert "add the path to support_files, or to ignored with a reason" in out
+    assert path.read_text() == before
+
+
+def test_a_new_core_file_is_triaged_as_support_or_ignored(tmp_path, capsys) -> None:
+    """Listed under support_files it is hashed; under ignored it stays quiet."""
+    path = _recorded(tmp_path, capsys)
+    record = json.loads(path.read_text())
+    record["support_files"]["helpers/new.py"] = ""
+    record["ignored"] = {"helpers/other.py": "core's own tooling, no rule uses it"}
+    path.write_text(json.dumps(record))
+    core = _core(tmp_path / "new", helpers__new=_HELPER, helpers__other=_HELPER)
+    assert _run(path, core, "--write") == 0
+    written = json.loads(path.read_text())
+    assert written["support_files"]["helpers/new.py"] == upstream.sha256(
+        _HELPER.encode()
+    )
+    assert written["ignored"] == {
+        "helpers/other.py": "core's own tooling, no rule uses it"
+    }
+    capsys.readouterr()
+    assert _run(path, core) == 0
+    assert "nothing changed" in capsys.readouterr().out
+
+
 def test_a_triaged_new_id_is_recorded_by_write(tmp_path, capsys) -> None:
     """Added to carried as {}, a new id is unrecorded until --write fills it in."""
     path = _recorded(tmp_path, capsys)

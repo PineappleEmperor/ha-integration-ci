@@ -83,13 +83,16 @@ step runs against the consumer's own checkout.
   core clears old violations, since a new repository has none. On each core release,
   `python scripts/pylint_upstream.py --tag <core tag>` downloads core's plugin at that tag
   and names every carried message whose core file changed, moved or vanished, every other
-  core file the copy carries that changed or vanished, and every message id core added
-  or removed; it exits 1 when anything did. Port each named file's change into the copy,
-  give each new id an entry under `carried` or `skipped`, with a reason, in
-  `UPSTREAM.json`, then run it again with `--write` to record the tag and its hashes;
-  `--write` refuses while an id is untriaged or a recorded support file has vanished,
-  and says what to do about each. `UPSTREAM.json` is the list of which of
-  core's messages the copy carries and which it skips, with the reason for each skip.
+  core file the copy carries that changed or vanished, every core file that defines no
+  message and is neither carried nor ignored, and every message id core added or
+  removed; it exits 1 when anything did. Port each named file's change into the copy,
+  give each new id an entry under `carried` or `skipped`, with a reason, and each new
+  file an entry under `support_files`, whose hash `--write` fills in, or under
+  `ignored`, with a reason, in `UPSTREAM.json`, then run it again with `--write` to
+  record the tag and its hashes; `--write` refuses while an id or a file is untriaged
+  or a recorded support file has vanished, and says what to do about each.
+  `UPSTREAM.json` is the list of which of core's messages the copy carries and which it
+  skips, and of the core files it ignores, with the reason for each skip and ignore.
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks

@@ -2,17 +2,20 @@
 
 UPSTREAM.json records the core tag the copy came from, every message core's
 plugin defined at that tag (carried here, or skipped with a reason), the core
-file each carried message lives in with its sha256, and the sha256 of every
-other core file the copy carries. Given a newer core tag, this reports:
+file each carried message lives in with its sha256, the sha256 of every other
+core file the copy carries, and each core file it deliberately leaves out, with
+the reason. Given a newer core tag, this reports:
 
 - carried messages whose core file changed, moved or vanished;
 - carried support files (helpers, constants) that changed or vanished;
+- core files that define no message and are neither carried nor ignored, such
+  as a helper core added;
 - message ids core added or removed across the whole plugin.
 
 Exit 1 when anything changed, 0 when nothing did. ``--write`` records the tag
 and its hashes once the changes are ported; it refuses while an added or removed
-id is still untriaged in UPSTREAM.json, or a recorded support file has vanished,
-and says what to do about each.
+id or a new core file is still untriaged in UPSTREAM.json, or a recorded support
+file has vanished, and says what to do about each.
 """
 
 import argparse
@@ -50,6 +53,7 @@ UNTRIAGED = {
         "port core's removal: delete the file from the copy and its entry "
         "from support_files"
     ),
+    "new core file": "add the path to support_files, or to ignored with a reason",
 }
 DEFAULT_UPSTREAM = (
     Path(__file__).resolve().parents[1]
@@ -195,6 +199,13 @@ def compare(upstream: dict[str, Any], files: dict[str, bytes]) -> list[str]:
             problems.append(f"changed: {path}")
 
     known = set(carried) | set(skipped)
+    # A file defining a message is triaged through its ids, reported below.
+    accounted = (
+        {path for _, path in core_messages.values()}
+        | set(upstream["support_files"])
+        | set(upstream.get("ignored", {}))
+    )
+    problems.extend(f"new core file: {path}" for path in sorted(set(files) - accounted))
     problems.extend(
         f"removed from core: {msg_id} {(carried | skipped)[msg_id].get('symbol', '')}"
         for msg_id in sorted(known - set(core_messages))
@@ -228,12 +239,20 @@ def updated(upstream: dict[str, Any], files: dict[str, bytes], tag: str) -> dict
         for path in sorted(upstream["support_files"])
         if path not in message_files
     }
+    # A core file the copy deliberately leaves out, with the reason; one core
+    # has since deleted needs no entry.
+    ignored = {
+        path: reason
+        for path, reason in sorted(upstream.get("ignored", {}).items())
+        if path in files
+    }
     return {
         "core_tag": tag,
         "source": f"https://github.com/home-assistant/core/tree/{tag}/{PLUGIN_PATH}",
         "carried": carried,
         "skipped": skipped,
         "support_files": support_files,
+        "ignored": ignored,
     }
 
 
