@@ -46,10 +46,12 @@ step runs against the consumer's own checkout.
   pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
   file, so without the port a flow error, abort, repair issue, action or action exception
   whose text is missing from `translations/en.json` passes here and fails in core; a user
-  then sees the raw key. The port changes three things only: the quality scale is read
-  beside the loaded integration rather than at a core path, the message names
-  `translations/en.json`, and a service a test registers is recognised by the consumer's
-  own `tests/` directory. It keeps core's `ignore_missing_translations` and
+  then sees the raw key. The port changes four things only: the `config-flow` rule is read
+  from the `quality_scale.yaml` beside the loaded integration rather than at a core path;
+  the `exception-translations` rule is read from the `quality_scale.yaml` of the
+  repository's one integration, where core keys it on the test's own path; the message
+  names `translations/en.json`; and a service a test registers is recognised by the
+  consumer's own `tests/` directory. It keeps core's `ignore_missing_translations` and
   `ignore_translations_for_mock_domains` fixtures for a test to override. python-validate
   checks this repository out at `github.job_workflow_sha`, as quality-audit does, and loads
   the plugin with `-p ha_translations`; the checkout comes after ruff and mypy so neither

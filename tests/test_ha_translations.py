@@ -126,23 +126,77 @@ def _translations(**drop: bool) -> dict:
     return {"config": {"step": {"user": step}, "error": errors}}
 
 
-def _run(tmp_path: pathlib.Path, translations: dict, config_flow_rule: str) -> str:
+_INIT_WITH_ACTION = '''"""Sample integration with an action that always fails."""
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.typing import ConfigType
+
+
+async def _boom(call: ServiceCall) -> None:
+    """Fail with an untranslated message."""
+    raise HomeAssistantError("It failed")
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the action."""
+    hass.services.async_register("sample", "boom", _boom)
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up nothing."""
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload nothing."""
+    return True
+'''
+
+_ACTION_CASE = '''"""The action fails, and says so."""
+
+import pytest
+
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.setup import async_setup_component
+
+
+async def test_boom(hass: HomeAssistant) -> None:
+    """Calling the action raises its error to the caller."""
+    assert await async_setup_component(hass, "sample", {})
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call("sample", "boom", blocking=True)
+'''
+
+
+def _run(
+    tmp_path: pathlib.Path,
+    translations: dict,
+    config_flow_rule: str,
+    *,
+    init: str = _INIT,
+    case: str = _CASE,
+    more_rules: str = "",
+) -> str:
     """Build the sample repository, run its suite with the plugin, return the output."""
     pkg = tmp_path / "custom_components/sample"
     (pkg / "translations").mkdir(parents=True)
     (pkg / "manifest.json").write_text(json.dumps(_MANIFEST))
-    (pkg / "__init__.py").write_text(_INIT)
+    (pkg / "__init__.py").write_text(init)
     (pkg / "config_flow.py").write_text(_FLOW)
     (pkg / "translations/en.json").write_text(json.dumps(translations))
     (pkg / "quality_scale.yaml").write_text(
-        f"rules:\n  config-flow: {config_flow_rule}\n"
+        f"rules:\n  config-flow: {config_flow_rule}\n{more_rules}"
     )
     (tmp_path / "conftest.py").write_text(_CONFTEST)
     (tmp_path / "pyproject.toml").write_text(
         '[tool.pytest.ini_options]\nasyncio_mode = "auto"\n'
     )
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests/test_flow.py").write_text(_CASE)
+    (tmp_path / "tests/test_flow.py").write_text(case)
     env = {**os.environ, "PYTHONPATH": str(_PLUGINS)}
     run = subprocess.run(
         [sys.executable, "-m", "pytest", "tests", "-q", "-p", "ha_translations"],
@@ -177,3 +231,28 @@ def test_a_field_description_is_required_once_config_flow_is_done(tmp_path) -> N
     out = _run(tmp_path / "done", _translations(data_description=True), "done")
     assert out.startswith("rc=1"), out
     assert "data_description.host" in out
+
+
+def test_an_untranslated_action_error_fails_once_exception_translations_is_done(
+    tmp_path,
+) -> None:
+    """The rule is read from the repository's one integration, not a core test path."""
+    translations = {
+        **_translations(),
+        "services": {"boom": {"name": "Boom", "description": "Always fails."}},
+    }
+
+    def run(rule: str) -> str:
+        return _run(
+            tmp_path / rule,
+            translations,
+            "done",
+            init=_INIT_WITH_ACTION,
+            case=_ACTION_CASE,
+            more_rules=f"  exception-translations: {rule}\n",
+        )
+
+    assert run("todo").startswith("rc=0")
+    out = run("done")
+    assert out.startswith("rc=1"), out
+    assert "Found untranslated HomeAssistantError exception: It failed" in out
