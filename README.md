@@ -93,76 +93,8 @@ step runs against the consumer's own checkout.
   or removed; it exits 1 when anything did. Port each named file's change into the copy,
   give each new id an entry under `carried` or `skipped`, with a reason, in
   `UPSTREAM.json`, then run it again with `--write` to record the tag and its hashes;
-  `--write` refuses while an id is untriaged. The set is every message core defines at
-  2026.9.4 but one:
-
-  | Id | Symbol | Status |
-  |---|---|---|
-  | C7401 | `home-assistant-logger-period` | carried |
-  | C7402 | `home-assistant-logger-capital` | carried |
-  | C7403 | `home-assistant-relative-import` | carried |
-  | C7404 | `home-assistant-absolute-import` | skipped: ruff's TID252 already bans a relative import that climbs out of the integration |
-  | C7405 | `home-assistant-component-root-import` | carried |
-  | C7406 | `home-assistant-helper-namespace-import` | carried |
-  | C7407 | `home-assistant-import-constant-alias` | carried |
-  | C7408 | `home-assistant-import-constant-unnecessary-alias` | carried |
-  | C7409 | `home-assistant-enforce-sorted-platforms` | carried |
-  | C7410 | `home-assistant-enforce-greek-micro-char` | carried |
-  | C7411 | `home-assistant-enforce-class-module` | carried |
-  | C7412 | `home-assistant-entity-description-redundant-default` | carried |
-  | C7413 | `home-assistant-duplicate-const` | carried |
-  | C7414 | `home-assistant-enforce-utcnow` | carried |
-  | C7415 | `home-assistant-domain-argument` | carried |
-  | C7425 | `home-assistant-enforce-now` | carried |
-  | C7427 | `home-assistant-enforce-naive-now` | carried |
-  | E7401 | `home-assistant-invalid-inheritance` | carried |
-  | E7402 | `home-assistant-argument-type` | carried |
-  | E7403 | `home-assistant-return-type` | carried |
-  | E7404 | `home-assistant-missing-super-call` | carried |
-  | E7405 | `home-assistant-action-swallowed-exception` | carried |
-  | E7406 | `home-assistant-exception-translation-key-missing` | carried |
-  | E7408 | `home-assistant-exception-translation-key-domain-mismatch` | carried |
-  | E7409 | `home-assistant-mdi-icon-not-found` | carried |
-  | E7410 | `home-assistant-mdi-icon-json-not-found` | carried |
-  | E7418 | `home-assistant-exception-placeholder-mismatch` | carried |
-  | R7401 | `home-assistant-consider-usefixtures-decorator` | carried |
-  | R7402 | `home-assistant-unused-test-fixture-argument` | carried |
-  | R7403 | `home-assistant-tests-redundant-usefixtures` | carried |
-  | R7404 | `home-assistant-tests-registry-fixtures` | carried |
-  | W7401 | `home-assistant-deprecated-import` | carried |
-  | W7402 | `home-assistant-async-callback-decorator` | carried |
-  | W7403 | `home-assistant-pytest-fixture-decorator` | carried |
-  | W7404 | `home-assistant-async-load-fixtures` | carried |
-  | W7405 | `home-assistant-use-runtime-data` | carried |
-  | W7406 | `home-assistant-unique-id-ip-based` | carried |
-  | W7407 | `home-assistant-config-flow-polling-field` | carried |
-  | W7408 | `home-assistant-config-flow-name-field` | carried |
-  | W7409 | `home-assistant-test-non-deterministic` | carried |
-  | W7410 | `home-assistant-missing-reauthentication-flow` | carried |
-  | W7411 | `home-assistant-missing-parallel-updates` | carried |
-  | W7412 | `home-assistant-missing-diagnostics` | carried |
-  | W7413 | `home-assistant-missing-config-entry-unloading` | carried |
-  | W7414 | `home-assistant-service-registered-in-setup-entry` | carried |
-  | W7415 | `home-assistant-sequential-executor-jobs` | carried |
-  | W7416 | `home-assistant-missing-has-entity-name` | carried |
-  | W7417 | `home-assistant-exception-not-translated` | carried |
-  | W7418 | `home-assistant-tests-direct-async-setup-entry` | carried |
-  | W7419 | `home-assistant-exception-message-with-translation` | carried |
-  | W7420 | `home-assistant-tests-direct-platform-async-setup-entry` | carried |
-  | W7421 | `home-assistant-tests-direct-async-migrate-entry` | carried |
-  | W7422 | `home-assistant-tests-direct-async-setup` | carried |
-  | W7423 | `home-assistant-missing-entity-unique-id` | carried |
-  | W7424 | `home-assistant-entity-unique-id-static` | carried |
-  | W7425 | `home-assistant-entity-unique-id-redundant-domain` | carried |
-  | W7426 | `home-assistant-tests-direct-async-unload-entry` | carried |
-  | W7427 | `home-assistant-entity-unique-id-redundant-platform` | carried |
-  | W7428 | `home-assistant-config-flow-field-not-translated` | carried |
-  | W7429 | `home-assistant-unnecessary-format-mac` | carried |
-  | W7430 | `home-assistant-serial-port-selector-usb-dependency` | carried |
-  | W7431 | `home-assistant-options-flow-field-not-translated` | carried |
-  | W7432 | `home-assistant-subentry-flow-field-not-translated` | carried |
-  | W7433 | `home-assistant-missing-test-before-configure` | carried |
-
+  `--write` refuses while an id is untriaged. `UPSTREAM.json` is the list of which of
+  core's messages the copy carries and which it skips, with the reason for each skip.
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
