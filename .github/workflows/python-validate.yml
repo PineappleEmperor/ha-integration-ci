@@ -55,5 +55,7 @@ jobs:
             echo "::error::tests/ exists but requirements.test.txt is missing"
             exit 1
           else
-            pytest tests/ -q --timeout=9 -p ha_translations
+            pytest tests/ -q --timeout=9 -p ha_translations \
+              --cov=custom_components --cov-report=json:coverage.json
+            python .ha-integration-ci/scripts/coverage_gate.py --root . --report coverage.json
           fi

@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, pytest with a 9-second per-test timeout and core's translation check on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -54,6 +54,12 @@ step runs against the consumer's own checkout.
   the plugin with `-p ha_translations`; the checkout comes after ruff and mypy so neither
   lints it. A local run gets the same check with
   `PYTHONPATH=<a clone of this repository>/pytest_plugins pytest -p ha_translations`.
+- **The coverage gate** is `scripts/coverage_gate.py`, run on the JSON report pytest-cov
+  writes. It fails any line of `config_flow.py` or `diagnostics.py` that no test ran, and
+  either module no test imported: those are the modules core's `codecov.yml` holds to 100%,
+  since the setup screens and the support dump are what a user meets when something is
+  wrong. Other modules carry no threshold here, as core's patch target does not bind them.
+  pytest-cov arrives with the pinned test harness.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
