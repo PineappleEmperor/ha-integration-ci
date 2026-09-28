@@ -35,7 +35,8 @@ step runs against the consumer's own checkout.
   pylint's astroid at 4.0.4, the versions Home Assistant core 2026.9.4 pins, because the
   consumer's rule set, `mypy.ini`, pylint rules and hooks are derived from core's and a
   newer tool reports errors core has not met yet. A repository without
-  `requirements.test.txt` gets `homeassistant` pinned to 2026.9.4 too, so pylint's
+  `requirements.test.txt` gets `homeassistant` pinned too, to the `core_tag` in
+  `UPSTREAM.json`, so pylint's
   inference runs against the release the pylint rules come from rather than the newest
   one; a repository with it installs that file alone and gets the release its test
   harness brings, which for a harness left unpinned is whatever the newest harness
