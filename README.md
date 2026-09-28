@@ -293,8 +293,8 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
 ## The version model
 
 - **A tag is a version.** GitHub versions repositories, not files, so a release of this
-  repository is a release of all three workflows and both scripts together, even when
-  only one moved. Tags are `vX.Y.Z`.
+  repository is a release of every workflow, script and plugin in it together, even
+  when only one moved. Tags are `vX.Y.Z`.
 - **Consumers pin a SHA and say which tag it is.** `@<sha> # vX.Y.Z`, the shape every
   pinned action already uses. A tag is mutable and a SHA is not; the comment is what a
   reader sees.
