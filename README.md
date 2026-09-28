@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, core's pylint rules on `custom_components/` and on `tests/` when it exists, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent, and then fails if a module the coverage gate holds exists; fails when `tests/` exists without `__init__.py` or without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, core's pylint rules on `custom_components/` and on `tests/` when it exists, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent, and then fails if a module the coverage gate holds exists; fails when `tests/` exists and it, or a directory in it on the path to a Python file, has no `__init__.py`, and when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -83,10 +83,11 @@ step runs against the consumer's own checkout.
   one, and its README says it is not for external use. The copy keeps core's checkers,
   message ids and symbols, so a diff against core stays readable, and changes only what
   `NOTICE` lists. python-validate runs it after the
-  checkout, with every other pylint check off, and fails on any hit. It fails too when
-  `tests/` exists without `__init__.py`: pylint then names the test modules `test_x`
-  rather than `tests.test_x`, and every rule that recognises a test by that name would
-  pass unseen. The ids it enables
+  checkout, with every other pylint check off, and fails on any hit. It fails too, naming each
+  missing file, when `tests/` exists and it, or any directory in it on the path to a
+  Python file, has no `__init__.py`: without `tests/__init__.py` pylint names the test
+  modules `test_x` rather than `tests.test_x`, and without one in a sub-directory it
+  skips that directory, so either way the test rules would pass unseen. The ids it enables
   come from `UPSTREAM.json`, which records for each one the core file it came from and
   that file's sha256 at the tag. R7402 is on although core's own config disables it while
   core clears old violations, since a new repository has none. On each core release,

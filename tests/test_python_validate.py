@@ -105,3 +105,27 @@ def test_pylint_fails_on_tests_that_are_not_a_package(tmp_path: pathlib.Path) ->
     assert "::error::" in result.stdout
     assert "tests/__init__.py" in result.stdout
     assert [call.split()[-1] for call in calls] == ["custom_components/"]
+
+
+def test_pylint_names_every_test_directory_that_is_not_a_package(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A sub-directory without __init__.py would be skipped, so each one is named."""
+    repo = _repo(
+        tmp_path,
+        "tests/__init__.py",
+        "tests/test_init.py",
+        "tests/helpers/__init__.py",
+        "tests/helpers/test_a.py",
+        "tests/sub/test_b.py",
+        "tests/other/deep/test_c.py",
+        "tests/fixtures/data.json",
+    )
+    result, calls = _run_step("Pylint", repo, ["pylint"])
+    assert result.returncode == 1
+    (error,) = (line for line in result.stdout.splitlines() if "::error::" in line)
+    for missing in ("sub", "other", "other/deep"):
+        assert f"tests/{missing}/__init__.py" in error
+    for present in ("tests/__init__.py", "helpers", "fixtures"):
+        assert present not in error
+    assert [call.split()[-1] for call in calls] == ["custom_components/"]

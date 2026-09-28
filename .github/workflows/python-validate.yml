@@ -65,12 +65,23 @@ jobs:
           status=0
           pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
             --persistent=n custom_components/ || status=1
-          if [ -d tests ] && [ ! -f tests/__init__.py ]; then
-            echo "::error::tests/ has no __init__.py, so pylint names its modules test_x, not tests.test_x, and every test rule would pass unseen; add tests/__init__.py"
-            status=1
-          elif [ -d tests ]; then
-            pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
-              --persistent=n tests/ || status=1
+          if [ -d tests ]; then
+            missing=$(
+              { echo tests; find tests -name '*.py' -printf '%h\n'; } | sort -u |
+                while read -r dir; do
+                  while [ "$dir" != . ]; do
+                    [ -f "$dir/__init__.py" ] || echo "$dir/__init__.py"
+                    dir=$(dirname "$dir")
+                  done
+                done | sort -u
+            )
+            if [ -n "$missing" ]; then
+              echo "::error::a directory under tests/ holding Python has no __init__.py, so pylint would skip or misname the test modules below it and every test rule would pass unseen there; add ${missing//$'\n'/, }"
+              status=1
+            else
+              pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
+                --persistent=n tests/ || status=1
+            fi
           fi
           exit "$status"
 
