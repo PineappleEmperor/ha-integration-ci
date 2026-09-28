@@ -65,7 +65,10 @@ jobs:
           status=0
           pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
             --persistent=n custom_components/ || status=1
-          if [ -d tests ]; then
+          if [ -d tests ] && [ ! -f tests/__init__.py ]; then
+            echo "::error::tests/ has no __init__.py, so pylint names its modules test_x, not tests.test_x, and every test rule would pass unseen; add tests/__init__.py"
+            status=1
+          elif [ -d tests ]; then
             pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
               --persistent=n tests/ || status=1
           fi

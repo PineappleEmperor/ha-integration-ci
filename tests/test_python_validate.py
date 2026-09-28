@@ -79,3 +79,29 @@ def test_install_takes_homeassistant_from_test_requirements(
     assert result.returncode == 0, result.stderr
     assert any("-r requirements.test.txt" in call for call in calls)
     assert not any("homeassistant==" in call for call in calls)
+
+
+def _repo(root: pathlib.Path, *files: str) -> pathlib.Path:
+    """A repository holding one integration module and *files*."""
+    for rel in ("custom_components/sample/__init__.py", *files):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text('"""A module."""\n')
+    return root
+
+
+def test_pylint_lints_a_tests_package(tmp_path: pathlib.Path) -> None:
+    """tests/__init__.py makes the modules tests.*, the names the test rules key on."""
+    repo = _repo(tmp_path, "tests/__init__.py", "tests/test_init.py")
+    result, calls = _run_step("Pylint", repo, ["pylint"])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert [call.split()[-1] for call in calls] == ["custom_components/", "tests/"]
+
+
+def test_pylint_fails_on_tests_that_are_not_a_package(tmp_path: pathlib.Path) -> None:
+    """Without tests/__init__.py every test rule would pass unseen, so the step fails."""
+    repo = _repo(tmp_path, "tests/test_init.py")
+    result, calls = _run_step("Pylint", repo, ["pylint"])
+    assert result.returncode == 1
+    assert "::error::" in result.stdout
+    assert "tests/__init__.py" in result.stdout
+    assert [call.split()[-1] for call in calls] == ["custom_components/"]
