@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, pytest with a 9-second per-test timeout on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, pytest with a 9-second per-test timeout and core's translation check on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -40,6 +40,20 @@ step runs against the consumer's own checkout.
   from `pytest-timeout`, which the pinned test harness brings. The job
   name says what the job is for rather than which tools it runs, because it is half of
   every consumer's required context: swapping a tool must not rename the check.
+- **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
+  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.9.0.
+  pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
+  file, so without the port a flow error, abort, repair issue, action or action exception
+  whose text is missing from `translations/en.json` passes here and fails in core; a user
+  then sees the raw key. The port changes three things only: the quality scale is read
+  beside the loaded integration rather than at a core path, the message names
+  `translations/en.json`, and a service a test registers is recognised by the consumer's
+  own `tests/` directory. It keeps core's `ignore_missing_translations` and
+  `ignore_translations_for_mock_domains` fixtures for a test to override. python-validate
+  checks this repository out at `github.job_workflow_sha`, as quality-audit does, and loads
+  the plugin with `-p ha_translations`; the checkout comes after ruff and mypy so neither
+  lints it. A local run gets the same check with
+  `PYTHONPATH=<a clone of this repository>/pytest_plugins pytest -p ha_translations`.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
@@ -282,7 +296,7 @@ under The five workflows in that README and given complete under Calling the wor
 ```
 ruff check .
 ruff format --check .
-python -m pytest tests/ -q
+python -m pytest tests/ -q -p no:homeassistant
 ```
 
 `ci.yml` runs the same three commands above, plus `python scripts/version_sync.py --root
@@ -290,7 +304,11 @@ python -m pytest tests/ -q
 since the scripts execute inside every consumer's quality-audit job. It installs `pyyaml`
 because `skill_audit.py` parses workflows and the tests import it — a local venv that
 already has it installed would hide a missing dependency, so the job names every import
-the suite reaches.
+the suite reaches. It installs pytest-homeassistant-custom-component at the version the
+skill's template pins, because `tests/test_ha_translations.py` runs a sample integration's
+suite under the plugin in a child pytest; `-p no:homeassistant` keeps that harness out of
+this suite's own run, whose sync tests its autouse async fixtures would break, and the
+test module skips when the harness is absent.
 
 Every check in `scripts/skill_audit.py` is a function returning `(failures, warnings)`
 and has a test in `tests/test_skill_audit.py`. A changed check gets its test changed

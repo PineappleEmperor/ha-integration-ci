@@ -210,6 +210,7 @@ split-on-trailing-comma = false
 "custom_components/**" = ["PTH"]
 "tests/**" = ["PTH", "SLF001", "INP001"]
 "scripts/*" = ["T20", "INP001"]
+"pytest_plugins/*" = ["INP001"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25

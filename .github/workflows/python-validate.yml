@@ -38,7 +38,16 @@ jobs:
       - name: Mypy
         run: mypy --config-file mypy.ini custom_components/
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PineappleEmperor/ha-integration-ci
+          ref: ${{ github.job_workflow_sha }}
+          path: .ha-integration-ci
+          persist-credentials: false
+
       - name: Pytest
+        env:
+          PYTHONPATH: .ha-integration-ci/pytest_plugins
         run: |
           if [ ! -d tests ]; then
             echo "::warning::no tests/ directory - quality_scale rules marked 'done' are unproven"
@@ -46,5 +55,5 @@ jobs:
             echo "::error::tests/ exists but requirements.test.txt is missing"
             exit 1
           else
-            pytest tests/ -q --timeout=9
+            pytest tests/ -q --timeout=9 -p ha_translations
           fi
