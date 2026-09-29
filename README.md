@@ -255,7 +255,8 @@ of it, not a substitute.
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
   `*.spec.ts`, a `translations/en.json` that is not `strings.json` leaf for leaf or that
   carries a `[%key:…%]` reference (Home Assistant serves `en.json` as written, and only core
-  resolves those references, at build time), the root `conftest.py`,
+  resolves those references, at build time), a `tests/conftest.py` that imports
+  `custom_components` and pulls in `enable_custom_integrations`,
   `asyncio_mode = "auto"`, the pinned test harness (a
   warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
   depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
@@ -318,7 +319,8 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
 - **v2.0.0's edits.** The required context `validate / Ruff, Pyright and Pytest` becomes
   `validate / Python validation` in `ruleset.json` and in the live ruleset, since the old
   name is never reported again and the bump PR waits on it forever; a `mypy.ini` joins
-  the repository root, derived from core's; `pyrightconfig.json` goes. Core's
+  the repository root, derived from core's; `pyrightconfig.json` goes; the root
+  `conftest.py` moves to `tests/conftest.py`, beside a `tests/__init__.py`. Core's
   `mypy.ini` disables `import-untyped` and fails an unused ignore, so a
   `# type: ignore[import-untyped]` the old audit asked for now fails and goes too. A
   repository without the skill's `.pre-commit-config.yaml` adds it, with the `.yamllint`,

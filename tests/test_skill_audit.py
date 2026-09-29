@@ -331,13 +331,41 @@ def _tested_integration(tmp_path) -> pathlib.Path:
     (tmp_path / "requirements.test.txt").write_text(
         "pytest-homeassistant-custom-component==0.13.354\n"
     )
-    (tmp_path / "conftest.py").write_text(
+    (tmp_path / "tests/__init__.py").write_text('"""Tests."""\n')
+    (tmp_path / "tests/conftest.py").write_text(
         "import custom_components\n\ndef enable_custom_integrations(): ...\n"
     )
     (tmp_path / "pyproject.toml").write_text(
         '[tool.pytest.ini_options]\nasyncio_mode = "auto"\n'
     )
     return tmp_path
+
+
+def test_a_root_conftest_is_named_as_the_one_to_move(tmp_path) -> None:
+    """Every repository scaffolded before the skill moved it carries the root conftest."""
+    root = _tested_integration(tmp_path)
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    (root / "tests/conftest.py").rename(root / "conftest.py")
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 1
+    assert "move conftest.py to tests/conftest.py" in fails[0]
+
+    (root / "conftest.py").unlink()
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 1 and "missing tests/conftest.py" in fails[0]
+
+
+def test_a_tests_conftest_missing_the_import_or_the_fixture_fails(tmp_path) -> None:
+    """Without the import HA finds no integration; without the fixture it loads none."""
+    root = _tested_integration(tmp_path)
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    (root / "tests/conftest.py").write_text('"""Fixtures."""\n')
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 2
+    assert any(
+        "tests/conftest.py does not import custom_components" in f for f in fails
+    )
+    assert any("enable_custom_integrations" in f for f in fails)
 
 
 def test_a_pytest_pointer_proves_the_suite_runs(tmp_path) -> None:

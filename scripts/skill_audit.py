@@ -534,19 +534,23 @@ def check_claims_have_tests(repo: Repo) -> Result:
                 "tests/ exists but requirements.test.txt is missing (pytest step "
                 "cannot install the suite)"
             )
-        if repo.exists("conftest.py"):
-            conftest = repo.text("conftest.py")
+        if repo.exists("tests/conftest.py"):
+            conftest = repo.text("tests/conftest.py")
             if not re.search(r"^import custom_components", conftest, re.MULTILINE):
                 fails.append(
-                    "conftest.py does not import custom_components (HA will not "
+                    "tests/conftest.py does not import custom_components (HA will not "
                     "discover the integration)"
                 )
             if "enable_custom_integrations" not in conftest:
-                fails.append("conftest.py does not pull in enable_custom_integrations")
-        else:
+                fails.append(
+                    "tests/conftest.py does not pull in enable_custom_integrations"
+                )
+        elif repo.exists("conftest.py"):
             fails.append(
-                "missing root conftest.py (must be at the repo root, not tests/conftest.py)"
+                "move conftest.py to tests/conftest.py, beside a tests/__init__.py"
             )
+        else:
+            fails.append("missing tests/conftest.py")
         if not re.search(r'asyncio_mode\s*=\s*"auto"', repo.text("pyproject.toml")):
             fails.append(
                 'pyproject.toml missing asyncio_mode = "auto" (async tests never run)'
