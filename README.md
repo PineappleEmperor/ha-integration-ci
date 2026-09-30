@@ -75,8 +75,8 @@ step runs against the consumer's own checkout.
   patch target: every line a change touches must run. A custom repository has no codecov
   patch view, so the gate holds those modules to a stricter bar than core's: every line of
   the whole file. It fails any line of one that no test ran, and any of them no test
-  imported. A held module with no tests fails too: without `tests/` python-validate runs
-  the gate on a report that does not exist, which it reads as nothing having run. Other
+  imported. Without `tests/` python-validate runs the gate on a report that does not
+  exist, which it reads as nothing having run. Other
   modules carry no threshold here. pytest-cov arrives with the pinned test harness.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
   in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
@@ -86,21 +86,22 @@ step runs against the consumer's own checkout.
   one, and its README says it is not for external use. The copy keeps core's checkers,
   message ids and symbols, so a diff against core stays readable, and changes only what
   `NOTICE` lists. python-validate runs it after the
-  checkout, with every other pylint check off, and fails on any hit. It fails too, naming each
-  missing file, when `tests/` exists and it, or any directory in it on the path to a
-  Python file, has no `__init__.py`: without `tests/__init__.py` pylint names the test
-  modules `test_x` rather than `tests.test_x`, and without one in a sub-directory it
-  skips that directory, so either way the test rules would pass unseen. The ids it enables
-  come from `UPSTREAM.json`, which records for each one the core file it came from and
-  that file's sha256 at the tag. R7402 is on although core's own config disables it while
-  core clears old violations, since a new repository has none. On each core release,
+  checkout, with every other pylint check off, and fails on any hit. The missing
+  `__init__.py` the table row above fails on is checked in this step, naming each file:
+  without `tests/__init__.py` pylint names the test modules `test_x` rather than
+  `tests.test_x`, and without one in a sub-directory it skips that directory, so either
+  way the test rules would pass unseen. The ids it enables come from `UPSTREAM.json`.
+  R7402 is on although core's own config disables it while core clears old violations,
+  since a new repository has none. On each core release,
   `python scripts/pylint_upstream.py --tag <core tag>` compares core's plugin at that
   tag with the copy. What it reports, when it exits 1, and what `--write` refuses to
   record over are in the script's module docstring; each refusal names its fix. Port
   what it reports, triage it in `UPSTREAM.json`, then run it again with `--write` to
   record the tag and its hashes.
-  `UPSTREAM.json` is the list of which of core's messages the copy carries and which it
-  skips, and of the core files it ignores, with the reason for each skip and ignore.
+  `UPSTREAM.json` records the core tag; each message core's plugin defines there, either
+  carried, with the core file it lives in and that file's sha256, or skipped with a
+  reason; the sha256 of every other core file the copy carries; and each core file it
+  leaves out, with the reason.
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
