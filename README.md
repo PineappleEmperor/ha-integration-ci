@@ -369,8 +369,9 @@ python -m pytest tests/ -q -p no:homeassistant
 ```
 
 `ci.yml` runs the same three commands above, plus `python scripts/version_sync.py --root
-.`. It tests the scripts under the same ruff tables and Python floor a consumer runs,
-since the scripts execute inside every consumer's quality-audit job. It installs `pyyaml`
+.`. It tests the scripts under the ruff rule selection and Python floor a consumer runs,
+with per-file ignores of its own, since the scripts execute inside every consumer's
+quality-audit job. It installs `pyyaml`
 because `skill_audit.py` parses workflows and the tests import it — a local venv that
 already has it installed would hide a missing dependency, so the job names every import
 the suite reaches. It installs pytest-homeassistant-custom-component at the version the
