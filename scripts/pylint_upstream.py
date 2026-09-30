@@ -1,18 +1,16 @@
 """Report core pylint plugin changes against our copy in pylint_plugins/ha_custom_pylint.
 
-UPSTREAM.json records the core tag the copy came from, every message core's
-plugin defined at that tag (carried here, or skipped with a reason), the core
-file each carried message lives in with its sha256, the sha256 of every other
-core file the copy carries, and each core file it deliberately leaves out, with
-the reason. Given a newer core tag, this reports:
+What UPSTREAM.json records is README.md, under The pylint rules. Given a core
+tag, this reports:
 
-- carried messages whose core file changed, moved or vanished;
+- carried messages whose core file changed, moved or vanished, and any whose
+  file is not yet recorded;
 - carried support files (helpers, constants) that changed or vanished;
 - core files that define no message and are neither carried nor ignored, such
   as a helper core added;
 - message ids core added or removed across the whole plugin.
 
-Exit 1 when anything changed, 0 when nothing did. ``--write`` records the tag
+Exit 1 when it reports anything, 0 when it reports nothing. ``--write`` records the tag
 and its hashes once the changes are ported; it refuses while an added or removed
 id or a new core file is still untriaged in UPSTREAM.json, or a recorded support
 file has vanished, and says what to do about each.
