@@ -65,7 +65,7 @@ step runs against the consumer's own checkout.
   a service a test registers is recognised by the consumer's own `tests/` directory. It
   keeps core's `ignore_missing_translations` and `ignore_translations_for_mock_domains`
   fixtures for a test to override. python-validate checks this repository out at
-  `github.job_workflow_sha`, as quality-audit does, and loads the plugin with
+  `job.workflow_sha`, as quality-audit does, and loads the plugin with
   `-p ha_translations`; the checkout comes after ruff and mypy so neither lints it. A
   local run gets the same check with
   `PYTHONPATH=<a clone of this repository>/pytest_plugins pytest -p ha_translations`.
@@ -345,7 +345,7 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   cooldown; third-party actions and packages keep the hold, which GitHub added against
   malicious releases, and security updates skip it regardless.
 - **The scripts ride the same pin.** `quality-audit.yml` checks this repository out at
-  `github.job_workflow_sha`, the commit of the reusable workflow that is running, so a
+  `job.workflow_sha`, the commit of the reusable workflow that is running, so a
   consumer can never run one release's workflow with another release's audit.
 - **No repo runs integration workflows on itself.** This repository's own CI is Working
   on this repository, below. The testbed rule and the check that enforces it are
