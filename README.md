@@ -87,7 +87,8 @@ step runs against the consumer's own checkout.
   message ids and symbols, so a diff against core stays readable, and changes only what
   `NOTICE` lists. python-validate runs it after the
   checkout, with every other pylint check off, and fails on any hit. The missing
-  `__init__.py` the table row above fails on is checked in this step, naming each file:
+  `__init__.py` the `python-validate.yml` row of *The three workflows* fails on is
+  checked in this step, naming each file:
   without `tests/__init__.py` pylint names the test modules `test_x` rather than
   `tests.test_x`, and without one in a sub-directory it skips that directory, so either
   way the test rules would pass unseen. The ids it enables come from `UPSTREAM.json`.
@@ -98,10 +99,10 @@ step runs against the consumer's own checkout.
   record over are in the script's module docstring; each refusal names its fix. Port
   what it reports, triage it in `UPSTREAM.json`, then run it again with `--write` to
   record the tag and its hashes.
-  `UPSTREAM.json` records the core tag; each message core's plugin defines there, either
-  carried, with the core file it lives in and that file's sha256, or skipped with a
-  reason; the sha256 of every other core file the copy carries; and each core file it
-  leaves out, with the reason.
+  `UPSTREAM.json` records the core tag and the plugin's source URL at it; each message
+  core's plugin defines there, by id and symbol, either carried, with the core file it
+  lives in and that file's sha256, or skipped with a reason; the sha256 of every other
+  core file the copy carries; and each core file it leaves out, with the reason.
 - **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks

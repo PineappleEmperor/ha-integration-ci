@@ -5,8 +5,8 @@ This package is derived from home-assistant/core pylint/plugins at 2026.9.0
 (https://github.com/home-assistant/core/tree/2026.9.0/pylint/plugins/pylint_home_assistant),
 and synced since to the core tag UPSTREAM.json records. It is licensed under
 the Apache License, Version 2.0. A copy of the licence is in LICENSE.md beside
-this file. What UPSTREAM.json records is the repository README, under The
-pylint rules.
+this file. What UPSTREAM.json records is the pylint rules bullet under
+Implementation notes in the repository README.
 
 What we changed
 ===============
