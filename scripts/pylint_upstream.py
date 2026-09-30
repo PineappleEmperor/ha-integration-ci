@@ -1,7 +1,7 @@
 """Report core pylint plugin changes against our copy in pylint_plugins/ha_custom_pylint.
 
-What UPSTREAM.json records is README.md, under The pylint rules. Given a core
-tag, this reports:
+What UPSTREAM.json records is the pylint rules bullet under Implementation notes
+in README.md. Given a core tag, this reports:
 
 - carried messages whose core file changed, moved or vanished, and any whose
   file is not yet recorded;
