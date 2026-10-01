@@ -239,7 +239,7 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   cooldown; third-party actions and packages keep the hold, which GitHub added against
   malicious releases, and security updates skip it regardless.
 - **The scripts ride the same pin.** `quality-audit.yml` checks this repository out at
-  `github.job_workflow_sha`, the commit of the reusable workflow that is running, so a
+  `job.workflow_sha`, the commit of the reusable workflow that is running, so a
   consumer can never run one release's workflow with another release's audit.
 - **No repo runs integration workflows on itself.** This repository's own CI is Working
   on this repository, below. The testbed rule and the check that enforces it are
