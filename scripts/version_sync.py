@@ -2,7 +2,7 @@
 """Check that every copy of the Python version agrees."""
 
 import argparse
-import json
+import configparser
 import pathlib
 import re
 import sys
@@ -46,16 +46,18 @@ def collect(root: pathlib.Path) -> dict[str, str | None]:
         f"{m.group('major')}.{m.group('minor')}" if m else None
     )
 
-    pyright = _read(root / "pyrightconfig.json")
-    if pyright:
-        try:
-            found["pyrightconfig.json"] = json.loads(pyright).get("pythonVersion")
-        except json.JSONDecodeError:
-            found["pyrightconfig.json"] = None
-    else:
-        found["pyrightconfig.json"] = None
-
+    found["mypy.ini"] = _mypy_python_version(_read(root / "mypy.ini"))
     return found
+
+
+def _mypy_python_version(text: str) -> str | None:
+    """The global python_version of a mypy.ini, which only its [mypy] section sets."""
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        parser.read_string(text)
+    except configparser.Error:
+        return None
+    return parser.get("mypy", "python_version", fallback=None)
 
 
 def problems(root: pathlib.Path) -> list[str]:
@@ -85,7 +87,7 @@ def thin(root: pathlib.Path) -> list[str]:
 
     A single declaration cannot disagree with anything, so printing "versions agree" is a
     green tick for work not done. An integration is expected to declare it in every
-    workflow that sets up Python, in ruff and in pyright; a repo that only runs pytest
+    workflow that sets up Python, in ruff and in mypy; a repo that only runs pytest
     legitimately declares one, so this warns rather than fails.
     """
     found = collect(root)

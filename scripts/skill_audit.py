@@ -266,6 +266,10 @@ def check_canonical_files(repo: Repo) -> Result:
         (".github/release-drafter.yml", ""),
         (".github/dependabot.yml", ""),
         (".gitignore", ""),
+        (
+            ".pre-commit-config.yaml",
+            " (python-validate runs its hooks in CI only when it exists)",
+        ),
     ):
         if not repo.exists(f):
             fails.append(f"missing {f}{why}")
@@ -530,19 +534,23 @@ def check_claims_have_tests(repo: Repo) -> Result:
                 "tests/ exists but requirements.test.txt is missing (pytest step "
                 "cannot install the suite)"
             )
-        if repo.exists("conftest.py"):
-            conftest = repo.text("conftest.py")
+        if repo.exists("tests/conftest.py"):
+            conftest = repo.text("tests/conftest.py")
             if not re.search(r"^import custom_components", conftest, re.MULTILINE):
                 fails.append(
-                    "conftest.py does not import custom_components (HA will not "
+                    "tests/conftest.py does not import custom_components (HA will not "
                     "discover the integration)"
                 )
             if "enable_custom_integrations" not in conftest:
-                fails.append("conftest.py does not pull in enable_custom_integrations")
-        else:
+                fails.append(
+                    "tests/conftest.py does not pull in enable_custom_integrations"
+                )
+        elif repo.exists("conftest.py"):
             fails.append(
-                "missing root conftest.py (must be at the repo root, not tests/conftest.py)"
+                "move conftest.py to tests/conftest.py, beside a tests/__init__.py"
             )
+        else:
+            fails.append("missing tests/conftest.py")
         if not re.search(r'asyncio_mode\s*=\s*"auto"', repo.text("pyproject.toml")):
             fails.append(
                 'pyproject.toml missing asyncio_mode = "auto" (async tests never run)'
@@ -808,17 +816,13 @@ def check_antipatterns(repo: Repo) -> Result:
     for pattern, message in ANTIPATTERNS:
         if any(re.search(pattern, t) for t in blob.values()):
             fails.append(message)
+    # A coded ignore is mypy's to judge: core's mypy.ini fails one that is unused.
     bare = [
-        f"{p}"
-        for p, t in blob.items()
-        if any(
-            "# type: ignore" in line and "import-untyped" not in line
-            for line in t.splitlines()
-        )
+        f"{p}" for p, t in blob.items() if re.search(r"#\s*type:\s*ignore(?!\s*\[)", t)
     ]
     if bare:
         fails.append(
-            "bare # type: ignore (Platinum: only [import-untyped] with a reason): "
+            "bare # type: ignore (name the error code, as core's mypy.ini demands): "
             + ", ".join(str(p.name) for p in map(pathlib.Path, bare[:3]))
         )
     # `from __future__ import annotations` is deliberately not demanded: Python 3.14
@@ -892,8 +896,17 @@ def check_quality_scale_and_manifest(repo: Repo) -> Result:
     ):
         if not repo.exists(f):
             fails.append(f"missing {f} ({why})")
-    if not repo.exists("pyrightconfig.json"):
-        warns.append("missing pyrightconfig.json")
+    # python-validate runs mypy with --config-file mypy.ini, which is red without one;
+    # this says why. Whether the file is core's is the skill's audit, not a byte check.
+    if not repo.exists("mypy.ini"):
+        fails.append(
+            "missing mypy.ini (python-validate type-checks with --config-file mypy.ini)"
+        )
+    if repo.exists("pyrightconfig.json"):
+        warns.append(
+            "pyrightconfig.json is read by nothing; python-validate type-checks with "
+            "mypy under mypy.ini, so delete it"
+        )
     return fails, warns
 
 
@@ -963,6 +976,53 @@ def check_docstrings(repo: Repo) -> Result:
             + "; ".join(bad[:3])
         ], []
     return [], []
+
+
+def _leaves(node, prefix: str = "") -> dict[str, str]:
+    """Every string in a translation file, keyed by its dotted path."""
+    if isinstance(node, dict):
+        out: dict[str, str] = {}
+        for k, v in node.items():
+            out.update(_leaves(v, f"{prefix}{k}."))
+        return out
+    return {prefix.removesuffix("."): str(node)}
+
+
+def check_translations_match_strings(repo: Repo) -> Result:
+    """The English file HA serves is strings.json, with nothing left to resolve."""
+    if not repo.cc:
+        return [], []
+    en_file, strings_file = repo.cc / "translations/en.json", repo.cc / "strings.json"
+    if not en_file.is_file():
+        return [], []
+    try:
+        en = _leaves(json.loads(en_file.read_text(encoding="utf-8")))
+        strings = (
+            _leaves(json.loads(strings_file.read_text(encoding="utf-8")))
+            if strings_file.is_file()
+            else None
+        )
+    except ValueError:
+        return [], []  # malformed JSON is check-json's and hassfest's to report
+    en_rel = en_file.relative_to(repo.root)
+    fails = []
+    if strings is not None:
+        drift = sorted(
+            k for k in en.keys() | strings.keys() if en.get(k) != strings.get(k)
+        )
+        if drift:
+            fails.append(
+                f"{en_rel} differs from strings.json at {', '.join(drift[:6])} — Home "
+                f"Assistant serves {en_rel}, so copy strings.json over it"
+            )
+    refs = sorted(k for k, v in en.items() if "[%key:" in v)
+    if refs:
+        fails.append(
+            f"{en_rel} carries [%key:…%] references at {', '.join(refs[:6])}; only core "
+            "resolves them at build time, so a custom integration shows them raw — write "
+            "the text out"
+        )
+    return fails, []
 
 
 def check_commit_hook(repo: Repo) -> Result:
@@ -1171,6 +1231,41 @@ def _matrix_names(name: str, job: dict) -> list[str]:
     ]
 
 
+# This repository. quality-audit.yml checks it out at the running workflow's commit, so a
+# caller pinned at that same commit is known by the job names read here, not by a prefix
+# that would also accept a name the job carried before a rename. A caller pinned at any
+# other commit may run another name, and keeps the prefix.
+_SELF = pathlib.Path(__file__).resolve().parents[1]
+_SELF_SLUG = "PineappleEmperor/ha-integration-ci/"
+
+
+def _self_sha() -> str | None:
+    """The commit this checkout is at, or None when git cannot say."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=_SELF,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def _own_workflow(uses: str) -> dict | None:
+    """The body a caller runs, when it pins this repository at this checkout's commit."""
+    path, _, sha = uses.rpartition("@")
+    if not path.startswith(_SELF_SLUG) or sha != _self_sha():
+        return None
+    try:
+        body = (_SELF / path.removeprefix(_SELF_SLUG)).read_text(encoding="utf-8")
+        return yaml.safe_load(body) or {}
+    except OSError, yaml.YAMLError:
+        return None
+
+
 def _contexts(doc: dict, source: str) -> dict[str, str]:
     """Check-run name -> source, jobs that produce a family recorded as its prefix."""
     out: dict[str, str] = {}
@@ -1178,7 +1273,11 @@ def _contexts(doc: dict, source: str) -> dict[str, str]:
         job = job or {}
         name = str(job.get("name") or jid)
         if "uses" in job:
-            out[f"{name} / "] = source
+            called = _own_workflow(str(job["uses"]))
+            if called is None:
+                out[f"{name} / "] = source
+            else:
+                out.update({f"{name} / {c}": source for c in _contexts(called, source)})
             continue
         for produced in _matrix_names(name, job):
             out[produced] = source
@@ -1454,6 +1553,7 @@ CHECKS = (
     check_autolabeler_title_only,
     check_drafter_categories,
     check_docstrings,
+    check_translations_match_strings,
     check_commit_hook,
     check_brand_assets,
     check_release_token,

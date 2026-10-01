@@ -42,6 +42,7 @@ def test_missing_canonical_workflows_are_listed(repo) -> None:
     assert any("python-validate.yml" in f for f in fails)
     assert any("dependency-review.yml" in f for f in fails)
     assert any(".gitignore" in f for f in fails)
+    assert any(".pre-commit-config.yaml" in f for f in fails)
 
 
 def test_a_panel_repo_must_carry_the_panel_workflow(repo) -> None:
@@ -330,13 +331,41 @@ def _tested_integration(tmp_path) -> pathlib.Path:
     (tmp_path / "requirements.test.txt").write_text(
         "pytest-homeassistant-custom-component==0.13.354\n"
     )
-    (tmp_path / "conftest.py").write_text(
+    (tmp_path / "tests/__init__.py").write_text('"""Tests."""\n')
+    (tmp_path / "tests/conftest.py").write_text(
         "import custom_components\n\ndef enable_custom_integrations(): ...\n"
     )
     (tmp_path / "pyproject.toml").write_text(
         '[tool.pytest.ini_options]\nasyncio_mode = "auto"\n'
     )
     return tmp_path
+
+
+def test_a_root_conftest_is_named_as_the_one_to_move(tmp_path) -> None:
+    """Every repository scaffolded before the skill moved it carries the root conftest."""
+    root = _tested_integration(tmp_path)
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    (root / "tests/conftest.py").rename(root / "conftest.py")
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 1
+    assert "move conftest.py to tests/conftest.py" in fails[0]
+
+    (root / "conftest.py").unlink()
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 1 and "missing tests/conftest.py" in fails[0]
+
+
+def test_a_tests_conftest_missing_the_import_or_the_fixture_fails(tmp_path) -> None:
+    """Without the import HA finds no integration; without the fixture it loads none."""
+    root = _tested_integration(tmp_path)
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    (root / "tests/conftest.py").write_text('"""Fixtures."""\n')
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 2
+    assert any(
+        "tests/conftest.py does not import custom_components" in f for f in fails
+    )
+    assert any("enable_custom_integrations" in f for f in fails)
 
 
 def test_a_pytest_pointer_proves_the_suite_runs(tmp_path) -> None:
@@ -604,6 +633,28 @@ def test_a_job_without_a_name_is_known_by_its_id(repo) -> None:
 
 def test_a_caller_job_produces_the_prefixed_context(repo) -> None:
     """A job calling a reusable workflow."""
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    _ruleset(repo, "validate / Python validation")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
+
+
+def test_a_caller_at_the_audit_s_own_commit_is_known_by_its_real_job_name(
+    repo, monkeypatch
+) -> None:
+    """The prefix alone passed a ruleset still naming the job from before its rename."""
+    monkeypatch.setattr(audit, "_self_sha", lambda: _SHA)
+    _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    _ruleset(repo, "validate / Ruff, Pyright and Pytest")
+    fails, _ = audit.check_required_contexts_have_producers(audit.Repo(repo))
+    assert len(fails) == 1 and "Ruff, Pyright and Pytest" in fails[0]
+
+    _ruleset(repo, "validate / Python validation")
+    assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
+
+
+def test_a_caller_at_another_commit_is_known_by_its_prefix(repo, monkeypatch) -> None:
+    """The checkout holds one release; a caller pinned at another may run another name."""
+    monkeypatch.setattr(audit, "_self_sha", lambda: "1" * 40)
     _wf(repo, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
     _ruleset(repo, "validate / Ruff, Pyright and Pytest")
     assert audit.check_required_contexts_have_producers(audit.Repo(repo)) == ([], [])
@@ -947,6 +998,44 @@ def test_the_future_import_is_not_demanded(repo) -> None:
     assert audit.check_antipatterns(audit.Repo(repo)) == ([], [])
 
 
+def _strings(repo, strings: dict, en: dict) -> pathlib.Path:
+    """An integration carrying strings.json and translations/en.json."""
+    pkg = repo / "custom_components/acmedev"
+    (pkg / "translations").mkdir(parents=True)
+    (pkg / "strings.json").write_text(json.dumps(strings))
+    (pkg / "translations/en.json").write_text(json.dumps(en))
+    return pkg
+
+
+def test_an_english_copy_that_matches_passes(repo) -> None:
+    """en.json is strings.json, key for key, in any order."""
+    _strings(
+        repo,
+        {"config": {"error": {"a": "A", "b": "B"}}},
+        {"config": {"error": {"b": "B", "a": "A"}}},
+    )
+    assert audit.check_translations_match_strings(audit.Repo(repo)) == ([], [])
+
+
+def test_an_english_copy_that_drifted_fails(repo) -> None:
+    """A key added to strings.json alone never reaches the UI, which reads en.json."""
+    _strings(
+        repo,
+        {"config": {"error": {"a": "A", "b": "B"}}},
+        {"config": {"error": {"a": "A"}}},
+    )
+    fails, _ = audit.check_translations_match_strings(audit.Repo(repo))
+    assert len(fails) == 1 and "config.error.b" in fails[0]
+
+
+def test_a_key_reference_in_the_english_copy_fails(repo) -> None:
+    """Only core resolves [%key:…%]; a custom integration shows it raw."""
+    ref = "[%key:common::config_flow::error::cannot_connect%]"
+    _strings(repo, {"config": {"error": {"a": ref}}}, {"config": {"error": {"a": ref}}})
+    fails, _ = audit.check_translations_match_strings(audit.Repo(repo))
+    assert len(fails) == 1 and "config.error.a" in fails[0] and "[%key:" in fails[0]
+
+
 def _integration(repo, **files: str) -> pathlib.Path:
     """A minimal integration package, plus any extra files by name."""
     pkg = repo / "custom_components/acmedev"
@@ -1151,6 +1240,19 @@ def test_a_deprecated_api_and_a_bare_ignore_fail(repo) -> None:
     assert any("bare # type: ignore" in f and "notify.py" in f for f in fails)
 
 
+def test_an_ignore_naming_its_error_code_passes(repo) -> None:
+    """Whether a coded ignore is needed is mypy's call; core's config fails an unused one."""
+    _integration(
+        repo,
+        **{
+            "api.py": "import x  # type: ignore[attr-defined]\n"
+            "import y  # type: ignore[import-untyped]\n"
+            "import z  # type: ignore [assignment]\n"
+        },
+    )
+    assert audit.check_antipatterns(audit.Repo(repo)) == ([], [])
+
+
 def test_a_default_branch_with_no_required_checks_fails(repo, monkeypatch) -> None:
     """Every workflow is advisory until the default branch requires it."""
     monkeypatch.setattr(
@@ -1219,6 +1321,30 @@ def test_an_exempt_rule_meets_the_claimed_tier(repo) -> None:
     )
     fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
     assert not any("claims" in f for f in fails)
+
+
+def test_a_missing_mypy_config_fails(repo) -> None:
+    """python-validate passes --config-file mypy.ini, so without one the gate is red."""
+    _integration(repo, **{"quality_scale.yaml": _ledger(**{"strict-typing": "todo"})})
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert any("mypy.ini" in f for f in fails)
+
+    (repo / "mypy.ini").write_text("[mypy]\npython_version = 3.14\n")
+    fails, _ = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("mypy.ini" in f for f in fails)
+
+
+def test_a_leftover_pyright_config_warns(repo) -> None:
+    """Nothing reads pyrightconfig.json any more; left behind, it reads as the type gate."""
+    _integration(repo, **{"quality_scale.yaml": _ledger()})
+    (repo / "mypy.ini").write_text("[mypy]\npython_version = 3.14\n")
+    _, warns = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("pyrightconfig.json" in w for w in warns)
+
+    (repo / "pyrightconfig.json").write_text("{}")
+    fails, warns = audit.check_quality_scale_and_manifest(audit.Repo(repo))
+    assert not any("pyright" in f for f in fails)
+    assert any("pyrightconfig.json" in w for w in warns)
 
 
 def test_a_manifest_that_is_not_an_object_is_reported_not_crashed(repo) -> None:

@@ -1,4 +1,5 @@
-# The [tool.ruff] tables a consumer runs; README.md says why.
+# The ruff rule selection a consumer runs, with per-file ignores of this repo's own;
+# README.md says why.
 
 [tool.ruff]
 target-version = "py314"
@@ -208,8 +209,10 @@ split-on-trailing-comma = false
 
 [tool.ruff.lint.per-file-ignores]
 "custom_components/**" = ["PTH"]
-"tests/**" = ["PTH", "SLF001", "INP001"]
+"custom_components/*/*/*" = ["TID252"]
+"tests/**" = ["PTH"]
 "scripts/*" = ["T20", "INP001"]
+"pytest_plugins/*" = ["INP001"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25

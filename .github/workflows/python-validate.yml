@@ -5,7 +5,7 @@ on:
 
 jobs:
   lint-and-type:
-    name: Ruff, Pyright and Pytest
+    name: Python validation
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,24 +27,76 @@ jobs:
 
       - name: Install
         run: |
-          uv pip install --system homeassistant ruff pyright
-          [ -f requirements.test.txt ] && uv pip install --system -r requirements.test.txt || true
+          uv pip install --system ruff==0.16.3 mypy==2.3.1 pylint==4.0.7 astroid==4.0.4
+          if [ -f requirements.test.txt ]; then
+            uv pip install --system -r requirements.test.txt
+          else
+            uv pip install --system homeassistant==2026.9.4
+          fi
 
       - name: Ruff
         run: |
           ruff check .
           ruff format --check .
 
-      - name: Pyright
-        run: python -m pyright custom_components/
+      - name: Mypy
+        run: mypy --config-file mypy.ini custom_components/
+
+      - name: Pre-commit hooks
+        if: hashFiles('.pre-commit-config.yaml') != ''
+        uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
+        with:
+          prek-version: 0.2.28
+        env:
+          PREK_SKIP: no-commit-to-branch,ruff-check,ruff-format
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PineappleEmperor/ha-integration-ci
+          ref: ${{ job.workflow_sha }}
+          path: .ha-integration-ci
+          persist-credentials: false
+
+      - name: Pylint
+        env:
+          PYTHONPATH: .ha-integration-ci/pylint_plugins
+        run: |
+          RULES=$(python -c "import json; print(','.join(json.load(open('.ha-integration-ci/pylint_plugins/ha_custom_pylint/UPSTREAM.json'))['carried']))")
+          status=0
+          pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
+            --persistent=n custom_components/ || status=1
+          if [ -d tests ]; then
+            missing=$(
+              { echo tests; find tests -name '*.py' -printf '%h\n'; } | sort -u |
+                while read -r dir; do
+                  while [ "$dir" != . ]; do
+                    [ -f "$dir/__init__.py" ] || echo "$dir/__init__.py"
+                    dir=$(dirname "$dir")
+                  done
+                done | sort -u
+            )
+            if [ -n "$missing" ]; then
+              echo "::error::a directory under tests/ holding Python has no __init__.py, so pylint would skip or misname the test modules below it and every test rule would pass unseen there; add ${missing//$'\n'/, }"
+              status=1
+            else
+              pylint --load-plugins=ha_custom_pylint --disable=all --enable="$RULES" \
+                --persistent=n tests/ || status=1
+            fi
+          fi
+          exit "$status"
 
       - name: Pytest
+        env:
+          PYTHONPATH: .ha-integration-ci/pytest_plugins
         run: |
           if [ ! -d tests ]; then
             echo "::warning::no tests/ directory - quality_scale rules marked 'done' are unproven"
+            python .ha-integration-ci/scripts/coverage_gate.py --root . --report no-tests.json
           elif [ ! -f requirements.test.txt ]; then
             echo "::error::tests/ exists but requirements.test.txt is missing"
             exit 1
           else
-            pytest tests/ -q
+            pytest tests/ -q --timeout=9 -p ha_translations \
+              --cov=custom_components --cov-report=json:coverage.json
+            python .ha-integration-ci/scripts/coverage_gate.py --root . --report coverage.json
           fi

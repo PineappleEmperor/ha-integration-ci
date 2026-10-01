@@ -4,7 +4,6 @@ Load the standalone script by path; it is not an importable package.
 """
 
 import importlib.util
-import json
 import pathlib
 
 _SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / "scripts"
@@ -21,7 +20,15 @@ _SETUP = (
 )
 
 
-def _repo(tmp_path, *, workflow="3.14", ruff="py314", pyright="3.14", pin=True):
+def _mypy(version: str) -> str:
+    """A mypy.ini with global settings under [mypy], then a per-module section."""
+    return (
+        f"[mypy]\npython_version = {version}\nstrict_equality = true\n\n"
+        "[mypy-acmedev.*]\ndisallow_untyped_defs = true\n"
+    )
+
+
+def _repo(tmp_path, *, workflow="3.14", ruff="py314", mypy="3.14", pin=True):
     """A repo declaring the python version in each of the places that carry it."""
     (tmp_path / ".github/workflows").mkdir(parents=True)
     (tmp_path / ".github/workflows/python-validate.yml").write_text(
@@ -30,7 +37,7 @@ def _repo(tmp_path, *, workflow="3.14", ruff="py314", pyright="3.14", pin=True):
     (tmp_path / "pyproject.toml").write_text(
         f'[tool.ruff]\ntarget-version = "{ruff}"\n'
     )
-    (tmp_path / "pyrightconfig.json").write_text(json.dumps({"pythonVersion": pyright}))
+    (tmp_path / "mypy.ini").write_text(_mypy(mypy))
     (tmp_path / "requirements.test.txt").write_text(
         "pytest-homeassistant-custom-component==0.13.354\n"
         if pin
@@ -76,7 +83,7 @@ def test_a_single_declaration_warns_rather_than_passing_silently(tmp_path) -> No
     assert vs.problems(tmp_path) == []
     warns = vs.thin(tmp_path)
     assert len(warns) == 1 and "nothing to compare" in warns[0]
-    assert "pyrightconfig.json" in warns[0]
+    assert "mypy.ini" in warns[0]
 
 
 def test_the_thin_warning_names_only_files_a_consumer_carries(tmp_path) -> None:
@@ -84,7 +91,7 @@ def test_the_thin_warning_names_only_files_a_consumer_carries(tmp_path) -> None:
     (tmp_path / "pyproject.toml").write_text('[tool.ruff]\ntarget-version = "py314"\n')
     warns = vs.thin(tmp_path)
     assert len(warns) == 1
-    assert "pyrightconfig.json" in warns[0]
+    assert "mypy.ini" in warns[0]
     assert "python_validate" not in warns[0] and "python-validate" not in warns[0]
 
 
@@ -139,6 +146,31 @@ def test_two_declarations_are_compared_not_warned(tmp_path) -> None:
     (tmp_path / ".github/workflows/python-validate.yml").write_text(
         _SETUP.format("3.14")
     )
-    (tmp_path / "pyrightconfig.json").write_text('{"pythonVersion": "3.13"}\n')
+    (tmp_path / "mypy.ini").write_text(_mypy("3.13"))
     assert vs.thin(tmp_path) == []
     assert any("disagrees" in p for p in vs.problems(tmp_path))
+
+
+def test_mypy_left_behind_is_caught(tmp_path) -> None:
+    """The type checker's floor moves with the rest, or the gate checks the wrong Python."""
+    found = vs.problems(_repo(tmp_path, mypy="3.13"))
+    assert len(found) == 1
+    assert "mypy.ini=3.13" in found[0]
+
+
+def test_a_python_version_outside_the_mypy_section_is_not_read(tmp_path) -> None:
+    """A per-module section never sets the global floor, so only [mypy] counts."""
+    _repo(tmp_path)
+    (tmp_path / "mypy.ini").write_text(
+        "[mypy]\nstrict_equality = true\n\n[mypy-tests.*]\npython_version = 3.12\n"
+    )
+    assert vs.problems(tmp_path) == []
+    assert vs.collect(tmp_path)["mypy.ini"] is None
+
+
+def test_a_leftover_pyrightconfig_is_not_a_declaration(tmp_path) -> None:
+    """Pyright is no longer the gate, so its config neither agrees nor disagrees."""
+    _repo(tmp_path)
+    (tmp_path / "pyrightconfig.json").write_text('{"pythonVersion": "3.12"}\n')
+    assert vs.problems(tmp_path) == []
+    assert "pyrightconfig.json" not in vs.collect(tmp_path)

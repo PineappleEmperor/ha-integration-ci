@@ -9,7 +9,7 @@ it, what the audit checks, and how a release of this repository reaches consumer
 
 | Reusable workflow | Job name (the check-run) | What it does |
 |---|---|---|
-| `.github/workflows/python-validate.yml` | `Ruff, Pyright and Pytest` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, pyright on `custom_components/`, pytest on the Python floor. Warns when `tests/` is absent; fails when `tests/` exists without `requirements.test.txt`. |
+| `.github/workflows/python-validate.yml` | `Python validation` | `ruff check .` and `ruff format --check .` under the consumer's `pyproject.toml`, `mypy --config-file mypy.ini custom_components/`, the consumer's `.pre-commit-config.yaml` hooks, core's pylint rules on `custom_components/` and on `tests/` when it exists, pytest with a 9-second per-test timeout and core's translation check on the Python floor, then `scripts/coverage_gate.py` on the coverage it measured. Warns when `tests/` is absent, and then fails if a module the coverage gate holds exists; fails when `tests/` exists and it, or a directory in it on the path to a Python file, has no `__init__.py`, and when `tests/` exists without `requirements.test.txt`. |
 | `.github/workflows/release.yml` | `Auto release zip` | On `release: published`: writes the tag into `manifest.json`, rebuilds the panel bundle when `frontend/` exists, zips `custom_components/<domain>` with the integration files at the zip root and attaches it to the release as `<domain>.zip`, the name a consumer's `hacs.json` must carry as `filename` for HACS to download it. The domain comes from the manifest. |
 | `.github/workflows/quality-audit.yml` | `ha-integration conformance check` | Runs `scripts/skill_audit.py --root .` and `scripts/version_sync.py --root .` from this repository's checkout against the consumer. |
 
@@ -31,6 +31,86 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
+  Ruff, mypy, pylint and prek are pinned to 0.16.3, 2.3.1, 4.0.7 and 0.2.28, with
+  pylint's astroid at 4.0.4, the versions Home Assistant core 2026.9.4 pins, because the
+  consumer's rule set, `mypy.ini`, pylint rules and hooks are derived from core's and a
+  newer tool reports errors core has not met yet. A repository without
+  `requirements.test.txt` gets `homeassistant` pinned too, to the `core_tag` in
+  `UPSTREAM.json`, so pylint's
+  inference runs against the release the pylint rules come from rather than the newest
+  one; a repository with it installs that file alone and gets the release its test
+  harness brings, which for a harness left unpinned is whatever the newest harness
+  pins; What the audit checks now says what the audit makes of an unpinned harness. The prek
+  action installs the latest prek unless its `prek-version` names one, so the step names
+  core's. Dependabot reads neither a `run:` line nor an action input, so the pins move by
+  hand: the tools' when core's `requirements_test.txt` and
+  `requirements_test_pre_commit.txt` move them, and `homeassistant`'s when the pylint
+  rules are synced to a new core tag, since `tests/test_python_validate.py` holds it to
+  the tag `UPSTREAM.json` records. Pytest's
+  `--timeout=9` is core's per-test limit, so a hung test fails in seconds rather than at
+  the job timeout; the flag comes from `pytest-timeout`, which the pinned test harness
+  brings. The job name says what the job is for rather than which tools it runs, because
+  it is half of every consumer's required context: swapping a tool must not rename the
+  check.
+- **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
+  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.9.0.
+  pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
+  file, so without the port a flow error, abort, repair issue, action or action exception
+  whose text is missing from `translations/en.json` passes here and fails in core; a user
+  then sees the raw key. The port changes four things only: the `config-flow` rule is read
+  from the `quality_scale.yaml` beside the loaded integration rather than at a core path;
+  the `exception-translations` rule is read from the `quality_scale.yaml` of the
+  repository's one integration, where core keys it on the test's own path; the message
+  names both `strings.json` and `translations/en.json`, which the audit holds equal; and
+  a service a test registers is recognised by the consumer's own `tests/` directory. It
+  keeps core's `ignore_missing_translations` and `ignore_translations_for_mock_domains`
+  fixtures for a test to override. python-validate checks this repository out at
+  `job.workflow_sha`, as quality-audit does, and loads the plugin with
+  `-p ha_translations`; the checkout comes after ruff and mypy so neither lints it. A
+  local run gets the same check with
+  `PYTHONPATH=<a clone of this repository>/pytest_plugins pytest -p ha_translations`.
+- **The coverage gate** is `scripts/coverage_gate.py`, run on the JSON report pytest-cov
+  writes. Core's `codecov.yml` gives twelve module kinds, the script's `FULL` list from
+  `backup.py` to `scene.py` with `config_flow.py` and `diagnostics.py` among them, a 100%
+  patch target: every line a change touches must run. A custom repository has no codecov
+  patch view, so the gate holds those modules to a stricter bar than core's: every line of
+  the whole file. It fails any line of one that no test ran, and any of them no test
+  imported. Without `tests/` python-validate runs the gate on a report that does not
+  exist, which it reads as nothing having run. Other
+  modules carry no threshold here. pytest-cov arrives with the pinned test harness.
+- **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
+  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
+  consumers test against, under Apache-2.0 with its `NOTICE`. Core's
+  plugin decides what an integration is by the module name `homeassistant.components.<domain>`,
+  which a custom integration never has, so run as published it stays silent on most of
+  one, and its README says it is not for external use. The copy keeps core's checkers,
+  message ids and symbols, so a diff against core stays readable, and changes only what
+  `NOTICE` lists. python-validate runs it after the
+  checkout, with every other pylint check off, and fails on any hit. The missing
+  `__init__.py` the `python-validate.yml` row of *The three workflows* fails on is
+  checked in this step, naming each file:
+  without `tests/__init__.py` pylint names the test modules `test_x` rather than
+  `tests.test_x`, and without one in a sub-directory it skips that directory, so either
+  way the test rules would pass unseen. The ids it enables come from `UPSTREAM.json`.
+  R7402 is on although core's own config disables it while core clears old violations,
+  since a new repository has none. On each core release,
+  `python scripts/pylint_upstream.py --tag <core tag>` compares core's plugin at that
+  tag with the copy. What it reports, when it exits 1, and what `--write` refuses to
+  record over are in the script's module docstring; each refusal names its fix. Port
+  what it reports, triage it in `UPSTREAM.json`, then run it again with `--write` to
+  record the tag and its hashes.
+  `UPSTREAM.json` records the core tag and the plugin's source URL at it; each message
+  core's plugin defines there, by id and symbol, either carried, with the core file it
+  lives in and that file's sha256, or skipped with a reason; the sha256 of every other
+  core file the copy carries; and each core file it leaves out, with the reason.
+- **The pre-commit hooks** run in CI because a hook that runs only on a developer's commit
+  is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
+  `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
+  are the consumer's `.pre-commit-config.yaml` hooks — the ha-integration skill's template
+  lists them — so a misspelt word in the Python, or a `strings.json` whose keys are out of
+  order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`,
+  which would fail every push to `main` as core's CI also skips it, and the two ruff
+  hooks, which the pinned ruff step already runs.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
   runner's own `python3` predates their syntax and once rejected it; that interpreter has
   no `pyyaml` preinstalled the way the runner's system python did, so it installs it.
@@ -122,12 +202,17 @@ job ids above give a consumer's ruleset these contexts:
 
 | Caller job | Check-run name | Required context? |
 |---|---|---|
-| `validate` | `validate / Ruff, Pyright and Pytest` | yes |
+| `validate` | `validate / Python validation` | yes |
 | `audit` | `audit / ha-integration conformance check` | yes |
 | `release` | `release / Auto release zip` | no, it runs on publish |
 
-`check_required_contexts_have_producers` understands a caller job as the prefix it
-produces.
+`check_required_contexts_have_producers` knows a caller pinned at the commit the audit
+itself runs from by the job names in that checkout, so a ruleset still naming a job from
+before a rename fails. Any other caller, of this repository at another commit or of
+another repository, is known by the prefix it produces, since the checkout holds one
+release only. A local run that can see the base branch therefore lets the old name
+through on the bump PR itself, while the base still pins the old release; CI checks the
+consumer out at depth 1, sees no base, and catches it.
 
 ## What the audit checks now
 
@@ -137,7 +222,8 @@ of it, not a substitute.
 - **The callers.** `check_canonical_files` requires `pr-checks.yml`, `lint-pr.yml`,
   `python-validate.yml`, `quality-audit.yml`, `dependency-review.yml` and
   `release-drafter.yml` in every repo, with `.github/release-drafter.yml`,
-  `.github/dependabot.yml` and `.gitignore` beside them; `hacs-validate.yml`,
+  `.github/dependabot.yml`, `.gitignore` and `.pre-commit-config.yaml` beside them;
+  `hacs-validate.yml`,
   `hassfest-validate.yml` and `release.yml` in an integration; `panel-bundle.yml` once
   `frontend/package.json` exists; and refuses the superseded `frontend_build.yml`.
   `check_callers` requires each caller's `uses:` to name the repository and workflow
@@ -169,8 +255,12 @@ of it, not a substitute.
   `done` or `exempt`, manifest honesty (`integration_type`,
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
-  `*.spec.ts`, the root `conftest.py`, `asyncio_mode = "auto"`, the pinned test harness (a
-  warning when unpinned), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
+  `*.spec.ts`, a `translations/en.json` that is not `strings.json` leaf for leaf or that
+  carries a `[%key:…%]` reference (Home Assistant serves `en.json` as written, and only core
+  resolves those references, at build time), a `tests/conftest.py` that imports
+  `custom_components` and pulls in `enable_custom_integrations`,
+  `asyncio_mode = "auto"`, the pinned test harness (a
+  warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
   depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
   warning), and `brand/icon.png`, the one brand file HACS gates a listing on — every other
   brand rule is quality and warns, a logo included, since the brands README says to ship
@@ -191,8 +281,8 @@ of it, not a substitute.
 
 `version_sync.py` compares the Python version across every workflow that sets one up in
 the consumer's own `.github/workflows/`, the three reusable workflows in the
-`.ha-integration-ci/` checkout beside it, ruff's `target-version` and
-`pyrightconfig.json`, and requires the test harness to be pinned. A consumer's own
+`.ha-integration-ci/` checkout beside it, ruff's `target-version` and the
+`python_version` in `mypy.ini`'s `[mypy]` section, and requires the test harness to be pinned. A consumer's own
 workflows are callers and declare nothing, so the comparison that matters is its floor
 against the CI it runs; this repository's own `ci.yml` is read by its own CI, not by a
 consumer's.
@@ -218,15 +308,31 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
 ## The version model
 
 - **A tag is a version.** GitHub versions repositories, not files, so a release of this
-  repository is a release of all three workflows and both scripts together, even when
-  only one moved. Tags are `vX.Y.Z`.
+  repository is a release of every workflow, script and plugin in it together, even
+  when only one moved. Tags are `vX.Y.Z`.
 - **Consumers pin a SHA and say which tag it is.** `@<sha> # vX.Y.Z`, the shape every
   pinned action already uses. A tag is mutable and a SHA is not; the comment is what a
   reader sees.
 - **Dependabot moves the pin.** A consumer's existing weekly grouped `github-actions`
   update bumps the SHA and the version comment together, so a CI release arrives at every
   integration as the same PR it already receives for its other actions, and goes green
-  with no hand edit. Nothing is copied in that PR.
+  with no hand edit. Nothing is copied in that PR. A major release is the exception: the
+  edits its PR needs before it can go green are listed here, under its version.
+- **v2.0.0's edits.** The required context `validate / Ruff, Pyright and Pytest` becomes
+  `validate / Python validation` in `ruleset.json` and in the live ruleset, since the old
+  name is never reported again and the bump PR waits on it forever; a `mypy.ini` joins
+  the repository root, derived from core's; `pyrightconfig.json` goes; the root
+  `conftest.py` moves to `tests/conftest.py`, beside a `tests/__init__.py`. Core's
+  `mypy.ini` disables `import-untyped` and fails an unused ignore, so a
+  `# type: ignore[import-untyped]` the old audit asked for now fails and goes too. A
+  repository without the skill's `.pre-commit-config.yaml` adds it, with the `.yamllint`,
+  `.prettierrc.js` and `.prettierignore` it reads; `translations/en.json` becomes an exact
+  copy of `strings.json` with every `[%key:…%]` written out; the tests reach every line of
+  each module the coverage gate holds, `config_flow.py` and `diagnostics.py` among them;
+  every message the tests make a flow, repair issue or action show has its text in
+  `translations/en.json`, as does a `data_description` for every flow field once
+  `config-flow` is `done`, and a `name` and `description` for every action the
+  integration registers; and the integration and its tests pass the pylint rules.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
@@ -261,15 +367,22 @@ under The five workflows in that README and given complete under Calling the wor
 ```
 ruff check .
 ruff format --check .
-python -m pytest tests/ -q
+python -m pytest tests/ -q -p no:homeassistant
 ```
 
 `ci.yml` runs the same three commands above, plus `python scripts/version_sync.py --root
-.`. It tests the scripts under the same ruff tables and Python floor a consumer runs,
-since the scripts execute inside every consumer's quality-audit job. It installs `pyyaml`
+.`. It tests the scripts under the ruff rule selection and Python floor a consumer runs,
+with per-file ignores of its own, since the scripts execute inside every consumer's
+quality-audit job. It installs `pyyaml`
 because `skill_audit.py` parses workflows and the tests import it — a local venv that
 already has it installed would hide a missing dependency, so the job names every import
-the suite reaches.
+the suite reaches. It installs pytest-homeassistant-custom-component at the version the
+skill's template pins, because `tests/test_ha_translations.py` runs a sample integration's
+suite under the plugin in a child pytest; `-p no:homeassistant` keeps that harness out of
+this suite's own run, whose sync tests its autouse async fixtures would break, and the
+test module skips when the harness is absent. It installs pylint and astroid at
+python-validate's pins, because `tests/test_ha_custom_pylint.py` lints sample
+repositories with the pylint rules in a child pylint and skips without them.
 
 Every check in `scripts/skill_audit.py` is a function returning `(failures, warnings)`
 and has a test in `tests/test_skill_audit.py`. A changed check gets its test changed

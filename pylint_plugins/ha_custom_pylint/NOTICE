@@ -1,0 +1,62 @@
+ha_custom_pylint
+Copyright the Home Assistant authors.
+
+This package is derived from home-assistant/core pylint/plugins at 2026.9.0
+(https://github.com/home-assistant/core/tree/2026.9.0/pylint/plugins/pylint_home_assistant),
+and synced since to the core tag UPSTREAM.json records. It is licensed under
+the Apache License, Version 2.0. A copy of the licence is in LICENSE.md beside
+this file. What UPSTREAM.json records is the pylint rules bullet under
+Implementation notes in the repository README.
+
+What we changed
+===============
+
+Every Python file: the import name pylint_home_assistant became
+ha_custom_pylint, so the package can sit beside core's without a clash.
+checkers/entity_unique_id_format.py differs in that one import line only,
+which the shorter name let ruff format join onto one line.
+
+Change 1: a custom integration is the integration. Core decides which code is
+an integration by its module name, under homeassistant.components. These files
+also accept custom_components.<domain>[.x], and a bare <domain>[.x] when
+<domain> resolves to a custom_components/<domain>/ directory holding a
+manifest.json, which is how pylint names the modules when it lints
+custom_components/<domain> from the repository root. A repo-root tests/
+package is taken to test the one integration in custom_components/.
+
+  helpers/module_info.py                 parse_module, is_integration_module and
+                                         get_module_platform accept both names;
+                                         parse_import_source parses the module a
+                                         called name was imported from.
+  helpers/integration.py                 read_manifest finds the domain of a bare
+                                         name; custom_test_domain names the
+                                         integration a repo-root tests/ tests.
+  checkers/imports.py                    C7403 fires on the custom_components.<domain>
+                                         spelling of the integration's own path; a
+                                         repo-root test module importing its own
+                                         integration is treated as core treats
+                                         tests.components.<domain> (no C7405 or C7407);
+                                         C7404 counts the segments above the domain
+                                         in each spelling, where core assumes two:
+                                         one in custom_components.<domain>, and
+                                         none in the bare <domain> or in a
+                                         repo-root tests package, which is its
+                                         own root.
+  checkers/actions/swallowed_exceptions.py
+                                         a decorator defined in the integration's own
+                                         modules is inspected, as core inspects those
+                                         under homeassistant.
+  checkers/tests/direct_async_setup_entry.py
+  checkers/tests/direct_async_migrate_entry.py
+  checkers/tests/direct_async_setup.py
+  checkers/tests/direct_async_unload_entry.py
+                                         a called name is matched on the import that
+                                         binds it, so an aliased import no longer
+                                         evades W7418, W7420, W7421, W7422 or W7426.
+
+Change 2: R7403 reads a custom repository's conftest files. Core's walk in
+checkers/tests/redundant_usefixtures.py stops below the tests root. Ours also
+reads tests/conftest.py and the repository-root conftest.py, where a custom
+repository keeps its fixtures, and stops there.
+
+Everything else is core's code as it stood at the tag.
