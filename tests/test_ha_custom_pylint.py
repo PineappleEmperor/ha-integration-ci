@@ -176,6 +176,26 @@ _SAMPLE = {
                 """Key the sensor on its entry."""
                 self._attr_unique_id = entry_id
         ''',
+    "custom_components/sample/light.py": '''
+        """Light platform for the sample integration."""
+
+        from homeassistant.components.light import ColorMode, LightEntity
+
+        PARALLEL_UPDATES = 0
+
+
+        class SampleLight(LightEntity):
+            """A light that names both its supported color modes and its color mode."""
+
+            _attr_has_entity_name = True
+            _attr_name = None
+            _attr_supported_color_modes = {ColorMode.ONOFF}
+            _attr_color_mode = ColorMode.ONOFF
+
+            def __init__(self, entry_id: str) -> None:
+                """Key the light on its entry."""
+                self._attr_unique_id = entry_id
+        ''',
     "custom_components/sample/config_flow.py": '''
         """Config flow for the sample integration."""
 
@@ -218,6 +238,12 @@ _SAMPLE = {
             ) -> ConfigFlowResult:
                 """Ask again."""
                 return await self.async_step_user()
+
+            async def async_step_pick(
+                self, user_input: dict[str, Any] | None = None
+            ) -> ConfigFlowResult:
+                """A menu whose every option has its step."""
+                return self.async_show_menu(step_id="pick", menu_options=["user"])
         ''',
     "custom_components/sample/diagnostics.py": '''
         """Diagnostics for the sample integration."""
@@ -280,7 +306,10 @@ _CLEAN_TESTS = {
     "tests/test_init.py": '''
         """Tests for the sample integration's setup."""
 
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+        from pytest_homeassistant_custom_component.common import (
+            MockConfigEntry,
+            load_json_object_fixture,
+        )
 
         from homeassistant.config_entries import ConfigEntryState
         from homeassistant.core import HomeAssistant
@@ -294,6 +323,11 @@ _CLEAN_TESTS = {
             assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
             assert mock_config_entry.state is ConfigEntryState.LOADED
             assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+
+
+        def test_a_fixture_is_read_as_json() -> None:
+            """The JSON fixture helper, not json.loads over load_fixture."""
+            assert load_json_object_fixture("reading.json")
         ''',
 }
 
