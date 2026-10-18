@@ -31,8 +31,8 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
-  Ruff, mypy, pylint and prek are pinned to 0.16.3, 2.3.1, 4.0.7 and 0.2.28, with
-  pylint's astroid at 4.0.4, the versions Home Assistant core 2026.9.4 pins, because the
+  Ruff, mypy, pylint and prek are pinned to 0.16.9, 2.3.1, 4.0.8 and 0.5.4, with
+  pylint's astroid at 4.0.4, the versions Home Assistant core 2026.10.2 pins, because the
   consumer's rule set, `mypy.ini`, pylint rules and hooks are derived from core's and a
   newer tool reports errors core has not met yet. A repository without
   `requirements.test.txt` gets `homeassistant` pinned too, to the `core_tag` in
