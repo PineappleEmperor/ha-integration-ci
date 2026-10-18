@@ -25,7 +25,7 @@ jobs:
           cache-dependency-glob: pyproject.toml
       - run: >-
           uv pip install --system --quiet pyyaml ruff==0.16.9 pytest
-          pytest-homeassistant-custom-component==0.13.367
+          pytest-homeassistant-custom-component==0.13.373
           pylint==4.0.8 astroid==4.0.4
       - run: ruff check .
       - run: ruff format --check .
