@@ -31,7 +31,7 @@ jobs:
           if [ -f requirements.test.txt ]; then
             uv pip install --system -r requirements.test.txt
           else
-            uv pip install --system homeassistant==2026.9.4
+            uv pip install --system homeassistant==2026.10.2
           fi
 
       - name: Ruff

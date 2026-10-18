@@ -1,6 +1,6 @@
 {
-  "core_tag": "2026.9.4",
-  "source": "https://github.com/home-assistant/core/tree/2026.9.4/pylint/plugins/pylint_home_assistant",
+  "core_tag": "2026.10.2",
+  "source": "https://github.com/home-assistant/core/tree/2026.10.2/pylint/plugins/pylint_home_assistant",
   "carried": {
     "C7401": {
       "symbol": "home-assistant-logger-period",
@@ -190,12 +190,12 @@
     "W7407": {
       "symbol": "home-assistant-config-flow-polling-field",
       "file": "checkers/config_flow/no_polling.py",
-      "sha256": "2d87c57fff6fa4a86dc04bb7ac4f0d7807df870baf1b702ad5abdb039b565467"
+      "sha256": "310aa0943436e1b9dcb28d8883bf955d9796e2c56457d4ec91a4e63095fdf532"
     },
     "W7408": {
       "symbol": "home-assistant-config-flow-name-field",
       "file": "checkers/config_flow/no_name.py",
-      "sha256": "473220d3bf4578f2f4326051ac34a8858c021d8b9c78ed861381a4e3e04b64cd"
+      "sha256": "0e42a4b1d8e19af8fa584f42f3499d9362d70640a110d6d08dbeeca64d835bdc"
     },
     "W7409": {
       "symbol": "home-assistant-test-non-deterministic",
@@ -295,7 +295,7 @@
     "W7428": {
       "symbol": "home-assistant-config-flow-field-not-translated",
       "file": "checkers/flow_translations.py",
-      "sha256": "876c8f28878ca2f2afbc82027afbf8a31d9cb5904bc34fa7b9a6f2d392090fc6"
+      "sha256": "ffb2c8b8a66ba73b72fbdedbe7f6046ead8388779da8fe87a31a06c0b87df1d7"
     },
     "W7429": {
       "symbol": "home-assistant-unnecessary-format-mac",
@@ -310,17 +310,37 @@
     "W7431": {
       "symbol": "home-assistant-options-flow-field-not-translated",
       "file": "checkers/flow_translations.py",
-      "sha256": "876c8f28878ca2f2afbc82027afbf8a31d9cb5904bc34fa7b9a6f2d392090fc6"
+      "sha256": "ffb2c8b8a66ba73b72fbdedbe7f6046ead8388779da8fe87a31a06c0b87df1d7"
     },
     "W7432": {
       "symbol": "home-assistant-subentry-flow-field-not-translated",
       "file": "checkers/flow_translations.py",
-      "sha256": "876c8f28878ca2f2afbc82027afbf8a31d9cb5904bc34fa7b9a6f2d392090fc6"
+      "sha256": "ffb2c8b8a66ba73b72fbdedbe7f6046ead8388779da8fe87a31a06c0b87df1d7"
     },
     "W7433": {
       "symbol": "home-assistant-missing-test-before-configure",
       "file": "checkers/quality_scale/test_before_configure.py",
       "sha256": "3280ef278d7f34f47403451b61eecc1bace68cb2bac686c1f8b4de13c646a05b"
+    },
+    "W7434": {
+      "symbol": "home-assistant-config-flow-menu-missing-step",
+      "file": "checkers/config_flow/menu_options.py",
+      "sha256": "8330229ff215af7d5642032390ae31ca402390c6b89a5ac04967b29be0e37f8e"
+    },
+    "W7435": {
+      "symbol": "home-assistant-json-fixture",
+      "file": "checkers/json_fixture.py",
+      "sha256": "31e90872652e1c1a69b6569733ff1baf75cd28bc091d0ab7e6d33dff1501c1b4"
+    },
+    "W7436": {
+      "symbol": "home-assistant-light-missing-color-mode",
+      "file": "checkers/light_color_mode.py",
+      "sha256": "e22471591d17f3eaf6fe9ec1bf0f0ee62c40357aa968b2eb70b6ad537060a0e1"
+    },
+    "W7437": {
+      "symbol": "home-assistant-light-missing-supported-color-modes",
+      "file": "checkers/light_color_mode.py",
+      "sha256": "e22471591d17f3eaf6fe9ec1bf0f0ee62c40357aa968b2eb70b6ad537060a0e1"
     }
   },
   "skipped": {},
@@ -333,16 +353,16 @@
     "checkers/config_flow/__init__.py": "84298b94d699a1f8268c68602e71b2b26ae7f8ead4e81ec128f49977da21b370",
     "checkers/quality_scale/__init__.py": "b777fbd4d36abf575ee966c75f165c6d33aedc1d7dd5d91b99d7ac555a305cde",
     "checkers/tests/__init__.py": "5303c8aa69c0ce5f9d40ea8f3c35dc45cb47ad7bf4cd7a9c9f092a640e84a61e",
-    "checkers/type_hints/const.py": "51fb2556c56153485dc57e90f8aa433807302da8304faeffdf4a40596a29aeb5",
+    "checkers/type_hints/const.py": "5f5b23bff33c3b83b6138c52a7bb75a9a993fd5e69d3daa4fda4b28abe25dafd",
     "checkers/type_hints/models.py": "2ef0539ec21b4c7f0afbcb8b505b7efdf07fbab3cd5adfed4d35447b6bf613e2",
     "checkers/type_hints/validators.py": "be4516b3f3d2c17e48a6424bb8341ed7daadc1d85f093b848a4f2745a337afb3",
     "const.py": "60163a3c2db509d5a484ae71a3dd044893c7e60255aeae7273c183fe3658c06d",
     "generated/__init__.py": "e96f3268a51dab61ce02ca26351014631c80bdb186aada1b4f7bae61ad83459e",
-    "generated/mdi_icons.py": "c7e944cfa2e7b78c7990ff4f1856c95829cdb57be830b24740e127bbe5805113",
+    "generated/mdi_icons.py": "46925ba0ff643b8b13eeb79c19435b82fa8d4e2d7eb5baddc50b6eb06c284a98",
     "helpers/__init__.py": "c2f7cb6034ecc0aa9180f81e1f1d2417b8bec516ba5252272c23795e837ef9ef",
-    "helpers/ast_utils.py": "f7d7367b0e7b3868e7fcaa3d3ca7afa23c45e384fbb5763ef08fb6d8c81d1a6a",
+    "helpers/ast_utils.py": "77ff84c82cf1af5eec54ce172c048cb4ae6bf63fce250641e5816cc69b9c85fa",
     "helpers/datetime_now.py": "880dedab4fb07a408ceb6ccc89eca4698fc0de8717855a7db332f469d7d84467",
-    "helpers/entity_class.py": "f4eb782807c0c927c2b457da39ad65fe10db12ec18e3f04dd231a717ef0323c8",
+    "helpers/entity_class.py": "db2eb7c3c61218f28aeffb57748c686e3955e076f20c1034a81625cace5d5e7b",
     "helpers/icons.py": "e4d0f2d200717a0a49dc877da811a64449c1d3cd33deb203b5c8e29ea3a66105",
     "helpers/integration.py": "95eca20d5771b205e61b574213e92b00bc3f0cf1cf13e5345c3eff07cd438cb8",
     "helpers/module_info.py": "65d6a6c75c132287e0d22b167bc7db371703b0ac1c30511f71a240d7972ecd68",

@@ -319,6 +319,8 @@ _DIRTY_TESTS = {
     "tests/test_dirty.py": '''
         """Tests that break every test rule."""
 
+        import json
+
         import pytest
         from pytest_homeassistant_custom_component.common import (
             MockConfigEntry,
@@ -347,6 +349,7 @@ _DIRTY_TESTS = {
             await async_migrate_entry(hass, entry)
             await async_unload_entry(hass, entry)
             load_fixture("x.json")
+            json.loads(load_fixture("y.json"))
             registry = er.async_get(hass)
             if registry:
                 assert entry
@@ -519,6 +522,12 @@ _DIRTY = {
                     ),
                 )
 
+            async def async_step_pick(
+                self, user_input: dict[str, Any] | None = None
+            ) -> ConfigFlowResult:
+                """A menu one of whose options has no step."""
+                return self.async_show_menu(step_id="pick", menu_options=["user", "gone"])
+
             @classmethod
             @callback
             def async_get_supported_subentry_types(
@@ -638,6 +647,25 @@ _DIRTY = {
                 except OSError:
                     _LOGGER.error("Failed")
         ''',
+    "custom_components/dirty/light.py": '''
+        """Light platform."""
+
+        from homeassistant.components.light import ColorMode, LightEntity
+
+        PARALLEL_UPDATES = 0
+
+
+        class ModesOnly(LightEntity):
+            """Supported color modes and no color mode."""
+
+            _attr_supported_color_modes = {ColorMode.ONOFF}
+
+
+        class ModeOnly(LightEntity):
+            """A color mode and no supported color modes."""
+
+            _attr_color_mode = ColorMode.ONOFF
+        ''',
     # The skill's ruff config ignores TID252 in a sub-package; only C7404 sees this.
     "custom_components/dirty/api/__init__.py": '"""A sub-package."""\n',
     "custom_components/dirty/api/hub.py": '''
@@ -664,6 +692,7 @@ _TESTS_SIDE = {
     "W7421",
     "W7422",
     "W7426",
+    "W7435",
 }
 
 
@@ -714,8 +743,8 @@ def _ids(messages: list[dict]) -> set[str]:
 
 
 def test_the_carried_set_is_the_whole_plugin() -> None:
-    """All 64 messages core's plugin defines at the tag are carried."""
-    assert len(CARRIED) == 64
+    """All 68 messages core's plugin defines at the tag are carried."""
+    assert len(CARRIED) == 68
     assert _UPSTREAM["skipped"] == {}
     assert set(CARRIED) >= _TESTS_SIDE
 

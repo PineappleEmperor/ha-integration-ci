@@ -79,7 +79,7 @@ step runs against the consumer's own checkout.
   exist, which it reads as nothing having run. Other
   modules carry no threshold here. pytest-cov arrives with the pinned test harness.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
-  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
+  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.10.2, the release
   consumers test against, under Apache-2.0 with its `NOTICE`. Core's
   plugin decides what an integration is by the module name `homeassistant.components.<domain>`,
   which a custom integration never has, so run as published it stays silent on most of
@@ -333,6 +333,10 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   `translations/en.json`, as does a `data_description` for every flow field once
   `config-flow` is `done`, and a `name` and `description` for every action the
   integration registers; and the integration and its tests pass the pylint rules.
+- **v3.0.0's edits.** The integration and its tests pass the pylint rules core added or
+  changed at 2026.10: W7434 to W7437, which check menu steps in a config flow, JSON test
+  fixtures and the colour modes of a light, and E7402, which now wants the `device`
+  argument of `async_get_device_diagnostics` typed `AnyDeviceEntry`.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
