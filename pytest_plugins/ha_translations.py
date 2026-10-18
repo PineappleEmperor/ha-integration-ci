@@ -1,7 +1,7 @@
 """Core's translation check, for a custom integration's test suite.
 
 A port of the autouse `check_translations` fixture in Home Assistant core's
-`tests/components/conftest.py` at 2026.9.0, which pytest-homeassistant-custom-component
+`tests/components/conftest.py` at 2026.10.2, which pytest-homeassistant-custom-component
 does not ship. README.md says what it checks and how python-validate.yml loads it.
 """
 
@@ -19,6 +19,7 @@ from homeassistant.components import repairs
 from homeassistant.config_entries import (
     DISCOVERY_SOURCES,
     ConfigEntriesFlowManager,
+    ConfigSubentryFlowManager,
     FlowResult,
     OptionsFlowManager,
 )
@@ -40,13 +41,13 @@ from homeassistant.data_entry_flow import (
     FlowResultType,
     section,
 )
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, Unauthorized
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import VolSchemaType
 from homeassistant.util import yaml as yaml_util
+import probatio
 import pytest
-import voluptuous as vol
 
 
 def _validate_translation_placeholders(
@@ -136,6 +137,45 @@ async def _validate_translation(
     )
 
 
+async def _validate_abort_translation_not_duplicated(
+    hass: HomeAssistant,
+    translation_errors: dict[str, str],
+    ignore_translations_for_mock_domains: set[str],
+    category: str,
+    component: str,
+    translation_domain: str,
+    key: str,
+    *,
+    shared_category: str | None = None,
+    shared_key: str | None = None,
+) -> None:
+    """Record a local copy of an abort translation another domain already provides.
+
+    A local translation with different wording is kept, since the integration
+    may raise the same reason itself to show its own wording.
+    """
+    if component in ignore_translations_for_mock_domains:
+        return
+    full_key = f"component.{component}.{category}.{key}"
+    translations = await async_get_translations(hass, "en", category, [component])
+    if (translation := translations.get(full_key)) is None:
+        return
+    shared_category = shared_category or category
+    shared_translations = await async_get_translations(
+        hass, "en", shared_category, [translation_domain]
+    )
+    if translation == shared_translations.get(
+        f"component.{translation_domain}.{shared_category}.{shared_key or key}"
+    ):
+        translation_errors[full_key] = (
+            f"Translation `{category}.{key}` of {component} duplicates the one of "
+            f"{translation_domain}, which translates this abort. Please remove it "
+            f"from custom_components/{component}/strings.json and "
+            f'translations/en.json, and pass translation_domain="{translation_domain}" '
+            f"wherever {component} raises this reason itself"
+        )
+
+
 @pytest.fixture
 def ignore_missing_translations() -> str | list[str]:
     """Ignore specific missing translations; override it to list them."""
@@ -191,7 +231,7 @@ async def _check_step_or_section_translations(
     integration: str,
     translation_prefix: str,
     description_placeholders: Mapping[str, str] | None,
-    data_schema: vol.Schema | None,
+    data_schema: probatio.Schema | None,
     ignore_translations_for_mock_domains: set[str],
 ) -> None:
     """Check a form step's headers, and each field unless it is a section."""
@@ -244,7 +284,7 @@ async def _check_config_flow_result_translations(
     translation_errors: dict[str, str],
     ignore_translations_for_mock_domains: set[str],
 ) -> None:
-    """Check the strings a config, options or repair flow result shows."""
+    """Check the strings a flow result shows; a subentry flow only for a copied abort."""
     if result["type"] is FlowResultType.CREATE_ENTRY:
         return
 
@@ -268,6 +308,27 @@ async def _check_config_flow_result_translations(
             **(issue.translation_placeholders or {}),
             **(description_placeholders or {}),
         }
+    elif isinstance(manager, ConfigSubentryFlowManager):
+        # A subentry flow is checked only for a duplicated shared abort translation.
+        if (
+            result["type"] is FlowResultType.ABORT
+            and (abort_domain := result.get("translation_domain")) is not None
+            and (entry := flow.hass.config_entries.async_get_entry(flow.handler[0]))
+            and abort_domain != entry.domain
+        ):
+            # The frontend resolves a shared subentry abort from the config section.
+            await _validate_abort_translation_not_duplicated(
+                flow.hass,
+                translation_errors,
+                ignore_translations_for_mock_domains,
+                "config_subentries",
+                entry.domain,
+                abort_domain,
+                f"{flow.handler[1]}.abort.{result['reason']}",
+                shared_category="config",
+                shared_key=f"abort.{result['reason']}",
+            )
+        return
     else:
         return
 
@@ -300,9 +361,20 @@ async def _check_config_flow_result_translations(
         return
 
     if result["type"] is FlowResultType.ABORT:
+        abort_domain = result.get("translation_domain")
+        if abort_domain is not None and abort_domain != integration:
+            await _validate_abort_translation_not_duplicated(
+                flow.hass,
+                translation_errors,
+                ignore_translations_for_mock_domains,
+                category,
+                integration,
+                abort_domain,
+                f"{key_prefix}abort.{result['reason']}",
+            )
         if not getattr(flow, "__flow_seen_before") and flow.source in DISCOVERY_SOURCES:
             return
-        if (abort_domain := result.get("translation_domain")) is not None:
+        if abort_domain is not None:
             integration = abort_domain
         await _validate_translation(
             flow.hass,
@@ -357,6 +429,8 @@ async def _check_exception_translation(
     ignore_translations_for_mock_domains: set[str],
 ) -> None:
     """Check the message an action's exception shows."""
+    if isinstance(exception, Unauthorized):
+        return
     if exception.translation_key is None:
         if _repository_rule(request, "exception-translations") == "done":
             translation_errors["quality_scale"] = (
@@ -422,7 +496,7 @@ async def check_translations(
     ignore_translations_for_mock_domains: str | list[str],
     request: pytest.FixtureRequest,
 ) -> AsyncGenerator[None]:
-    """Fail a test that shows a flow, issue, exception or action with no translation."""
+    """Fail a test that shows text with no translation, or a copy of a shared abort."""
     if not isinstance(ignore_missing_translations, list):
         ignore_missing_translations = [ignore_missing_translations]
 

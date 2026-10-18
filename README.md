@@ -53,15 +53,20 @@ step runs against the consumer's own checkout.
   it is half of every consumer's required context: swapping a tool must not rename the
   check.
 - **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
-  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.9.0.
+  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.10.2.
   pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
   file, so without the port a flow error, abort, repair issue, action or action exception
   whose text is missing from `translations/en.json` passes here and fails in core; a user
-  then sees the raw key. The port changes four things only: the `config-flow` rule is read
-  from the `quality_scale.yaml` beside the loaded integration rather than at a core path;
-  the `exception-translations` rule is read from the `quality_scale.yaml` of the
-  repository's one integration, where core keys it on the test's own path; the message
-  names both `strings.json` and `translations/en.json`, which the audit holds equal; and
+  then sees the raw key. An abort another domain translates, `homeassistant` in most
+  cases, also fails here as it does in core when the integration copies that domain's text
+  word for word into its own translations; one worded its own way passes, and so does an
+  `Unauthorized` action error, which core exempts. The port changes four things only: the
+  `config-flow` rule is read from the `quality_scale.yaml` beside the loaded integration
+  rather than at a core path; the `exception-translations` rule is read from the
+  `quality_scale.yaml` of the repository's one integration, where core keys it on the
+  test's own path; a message that names the file to change names
+  `custom_components/<domain>/strings.json` and `translations/en.json`, which the audit
+  holds equal, where core names `homeassistant/components/<domain>/strings.json`; and
   a service a test registers is recognised by the consumer's own `tests/` directory. It
   keeps core's `ignore_missing_translations` and `ignore_translations_for_mock_domains`
   fixtures for a test to override. python-validate checks this repository out at
@@ -337,6 +342,12 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   changed at 2026.10: W7434 to W7437, which check menu steps in a config flow, JSON test
   fixtures and the colour modes of a light, and E7402, which now wants the `device`
   argument of `async_get_device_diagnostics` typed `AnyDeviceEntry`.
+  An abort the integration raises with `translation_domain` set to another domain,
+  `homeassistant` in most cases, no longer carries a word-for-word copy of that domain's
+  text in `strings.json` and `translations/en.json`: the copy goes, or is reworded.
+  `async_update_reload_and_abort` and `async_update_and_abort` set that domain for
+  `reauth_successful` and `reconfigure_successful` when no `reason` is passed, so those two
+  are where a copy usually sits.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
