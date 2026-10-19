@@ -1038,41 +1038,61 @@ def test_a_key_reference_in_the_english_file_fails(repo) -> None:
     assert len(fails) == 1 and "config.error.a" in fails[0] and "[%key:" in fails[0]
 
 
-def test_a_panel_repo_must_ignore_node_modules(repo) -> None:
-    """An npm install under frontend/ otherwise offers the whole tree for staging."""
-    (repo / "frontend").mkdir()
-    (repo / ".gitignore").write_text("__pycache__/\n# node_modules/\n!node_modules/\n")
-    fails, _ = audit.check_node_modules_ignored(audit.Repo(repo))
-    assert len(fails) == 1 and "node_modules" in fails[0]
-
-    (repo / ".gitignore").unlink()
-    fails, _ = audit.check_node_modules_ignored(audit.Repo(repo))
-    assert len(fails) == 1 and "node_modules" in fails[0]
-
-
-def test_a_root_anchored_node_modules_does_not_cover_the_panel(repo) -> None:
-    """A leading slash anchors to the root; npm installs under frontend/."""
-    (repo / "frontend").mkdir()
-    (repo / ".gitignore").write_text("/node_modules/\n")
-    fails, _ = audit.check_node_modules_ignored(audit.Repo(repo))
-    assert len(fails) == 1 and "node_modules" in fails[0]
+def _panel_repo(root: pathlib.Path, ignores: dict[str, str]) -> audit.Repo:
+    """A git repository with frontend/ and the given ignore files, by path."""
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    (root / "frontend").mkdir(exist_ok=True)
+    for rel, text in ignores.items():
+        (root / rel).write_text(text)
+    return audit.Repo(root)
 
 
 @pytest.mark.parametrize(
-    "line",
+    "ignores",
     [
-        "node_modules/",
-        "node_modules",
-        "**/node_modules",
-        "frontend/node_modules/",
-        "/frontend/node_modules",
+        {},
+        {".gitignore": "__pycache__/\n# node_modules/\n"},
+        {".gitignore": "/node_modules/\n"},
+        {".gitignore": "node_modules/\n!node_modules/\n"},
+        {".gitignore": "node_modules/\n!frontend/node_modules\n"},
+        {".gitignore": "  node_modules\n"},
     ],
 )
-def test_each_spelling_that_ignores_node_modules_passes(repo, line: str) -> None:
-    """Each pattern git reads as covering frontend/node_modules/."""
+def test_a_panel_repo_git_does_not_ignore_node_modules_in_fails(repo, ignores) -> None:
+    """Git is the judge: a comment, a root anchor, a negation, a padded line."""
+    fails, warns = audit.check_node_modules_ignored(_panel_repo(repo, ignores))
+    assert len(fails) == 1 and "frontend/node_modules/" in fails[0]
+    assert warns == []
+
+
+@pytest.mark.parametrize(
+    "ignores",
+    [
+        {".gitignore": "node_modules/\n"},
+        {".gitignore": "node_modules\n"},
+        {".gitignore": "**/node_modules\n"},
+        {".gitignore": "/**/node_modules\n"},
+        {".gitignore": "*/node_modules\n"},
+        {".gitignore": "frontend/node_modules/\n"},
+        {".gitignore": "/frontend/node_modules\n"},
+        {".gitignore": "frontend/**/node_modules\n"},
+        {".gitignore": "frontend/node_modules/**\n"},
+        {".gitignore": "node_module*\n"},
+        {"frontend/.gitignore": "node_modules/\n"},
+    ],
+)
+def test_a_panel_repo_git_ignores_node_modules_in_passes(repo, ignores) -> None:
+    """Every spelling git honours, in the root .gitignore or in frontend/'s own."""
+    assert audit.check_node_modules_ignored(_panel_repo(repo, ignores)) == ([], [])
+
+
+def test_without_git_the_node_modules_check_says_not_checked(repo) -> None:
+    """Outside a repository git cannot answer, and the verdict says so."""
     (repo / "frontend").mkdir()
-    (repo / ".gitignore").write_text(f"__pycache__/\n{line}\n")
-    assert audit.check_node_modules_ignored(audit.Repo(repo)) == ([], [])
+    (repo / ".gitignore").write_text("node_modules/\n")
+    fails, warns = audit.check_node_modules_ignored(audit.Repo(repo))
+    assert fails == []
+    assert len(warns) == 1 and "NOT CHECKED" in warns[0]
 
 
 def test_a_repo_without_a_panel_is_not_asked_to_ignore_node_modules(repo) -> None:

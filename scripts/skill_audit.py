@@ -280,19 +280,38 @@ def check_node_modules_ignored(repo: Repo) -> Result:
     """A panel's npm install must not be offered for staging."""
     if not repo.exists("frontend"):
         return [], []
-    for line in repo.text(".gitignore").splitlines():
-        pattern = line.strip().rstrip("/")
-        if not pattern or pattern.startswith(("#", "!")):
-            continue
-        # git anchors a pattern holding a slash to the root; npm installs in frontend/.
-        if pattern.removeprefix("**/") == "node_modules" or (
-            pattern.lstrip("/").removeprefix("**/") == "frontend/node_modules"
-        ):
-            return [], []
-    return [
-        ".gitignore does not ignore node_modules/ (frontend/ exists, so an npm install "
-        "puts the whole tree one `git add .` from a commit)"
-    ], []
+    # Git's own answer, from the repository's ignore files alone: a user's global
+    # excludes file would pass a repository that offers the tree to everyone else.
+    try:
+        probe = subprocess.run(
+            [
+                "git",
+                "-c",
+                "core.excludesFile=/dev/null",
+                "check-ignore",
+                "-q",
+                "--no-index",
+                "frontend/node_modules/package.json",
+            ],
+            cwd=repo.root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        probe = None
+    if probe is not None and probe.returncode == 0:
+        return [], []
+    if probe is not None and probe.returncode == 1:
+        return [
+            "git does not ignore frontend/node_modules/ (frontend/ exists, so an npm "
+            "install puts the whole tree one `git add .` from a commit): add "
+            "node_modules/ to .gitignore"
+        ], []
+    return [], [
+        "git could not say whether frontend/node_modules/ is ignored — NOT CHECKED, "
+        "not passed"
+    ]
 
 
 def check_callers(repo: Repo) -> Result:

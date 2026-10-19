@@ -234,8 +234,6 @@ of it, not a substitute.
   `hacs-validate.yml`,
   `hassfest-validate.yml` and `release.yml` in an integration; `panel-bundle.yml` once
   `frontend/package.json` exists; and refuses the superseded `frontend_build.yml`.
-  `check_node_modules_ignored` requires a `.gitignore` line covering
-  `frontend/node_modules/` once `frontend/` exists.
   `check_callers` requires each caller's `uses:` to name the repository and workflow
   path it stands for (`release-flow` for `pr-checks`, `lint-pr`, `release-drafter` and
   `auto-draft-pr`, this repository for `python-validate`, `quality-audit` and `release`,
@@ -259,7 +257,10 @@ of it, not a substitute.
   APIs, bare `# type: ignore`, multi-line docstrings on functions and classes under
   `custom_components/` (module docstrings are exempt, a missing docstring is not checked,
   and a consumer's own `scripts/` and `tests/` are not read), a tracked compiled artefact
-  (a `.py[cod]` file or a `__pycache__`, per-interpreter bytes that churn every diff), the
+  (a `.py[cod]` file or a `__pycache__`, per-interpreter bytes that churn every diff),
+  `frontend/node_modules/` left unignored once `frontend/` exists (asked of
+  `git check-ignore`, with any global excludes file left out, and a warning when git
+  cannot answer), the
   canonical `quality_scale.yaml` rule set and — since hassfest walks a claimed tier for
   core integrations only — every rule at or below the manifest's `quality_scale` marked
   `done` or `exempt`, manifest honesty (`integration_type`,
