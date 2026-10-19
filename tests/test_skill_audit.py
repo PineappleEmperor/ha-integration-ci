@@ -1013,12 +1013,19 @@ def test_the_english_file_alone_passes(repo) -> None:
 
 
 def test_a_strings_file_fails(repo) -> None:
-    """Home Assistant never reads strings.json, so a custom integration carries none."""
+    """Home Assistant never loads strings.json, so a custom integration carries none.
+
+    Tools do read it — hassfest validates it, and the pylint copy reads it before
+    translations/en.json — so the message says what Home Assistant does, not that
+    nothing reads it.
+    """
     pkg = _english(repo, {"config": {"error": {"a": "A"}}})
     (pkg / "strings.json").write_text(json.dumps({"config": {"error": {"a": "A"}}}))
     fails, _ = audit.check_translations(audit.Repo(repo))
     assert len(fails) == 1
     assert "strings.json" in fails[0] and "translations/en.json" in fails[0]
+    assert "Home Assistant never loads" in fails[0]
+    assert "read by nothing" not in fails[0]
 
 
 def test_a_strings_file_without_an_english_file_fails(repo) -> None:

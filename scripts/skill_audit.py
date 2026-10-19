@@ -1033,11 +1033,11 @@ def check_translations(repo: Repo) -> Result:
     en_file, strings_file = repo.cc / "translations/en.json", repo.cc / "strings.json"
     en_rel = en_file.relative_to(repo.root)
     fails = []
-    # Home Assistant loads translations/<language>.json and never strings.json, which
-    # core turns into en.json at build time; a custom integration has no build.
+    # Home Assistant loads translations/<language>.json and never strings.json; tools
+    # still read it — hassfest validates it, and the pylint copy prefers it to en.json.
     if strings_file.is_file():
         fails.append(
-            f"{strings_file.relative_to(repo.root)} is read by nothing — Home Assistant "
+            f"Home Assistant never loads {strings_file.relative_to(repo.root)} — it "
             f"loads {en_rel}; keep the text there and delete strings.json"
         )
     if not en_file.is_file():
