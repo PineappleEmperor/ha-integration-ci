@@ -90,7 +90,9 @@ step runs against the consumer's own checkout.
   which a custom integration never has, so run as published it stays silent on most of
   one, and its README says it is not for external use. The copy keeps core's checkers,
   message ids and symbols, so a diff against core stays readable, and changes only what
-  `NOTICE` lists. python-validate runs it after the
+  `NOTICE` lists: `tests/test_pylint_copy.py` fails a file `NOTICE` does not name that
+  differs from the sha256 `UPSTREAM.json` records for core's, and a file it names that
+  does not differ. python-validate runs it after the
   checkout, with every other pylint check off, and fails on any hit. The missing
   `__init__.py` the `python-validate.yml` row of *The three workflows* fails on is
   checked in this step, naming each file:
