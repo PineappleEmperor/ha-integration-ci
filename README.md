@@ -90,9 +90,10 @@ step runs against the consumer's own checkout.
   which a custom integration never has, so run as published it stays silent on most of
   one, and its README says it is not for external use. The copy keeps core's checkers,
   message ids and symbols, so a diff against core stays readable, and changes only what
-  `NOTICE` lists: `tests/test_pylint_copy.py` fails a file `NOTICE` does not name that
-  differs from the sha256 `UPSTREAM.json` records for core's, and a file it names that
-  does not differ. python-validate runs it after the
+  `NOTICE` lists, each change recorded in `CHANGES.diff` beside it: `tests/test_pylint_copy.py`
+  undoes the package name and that diff on every copied file and fails any that does not
+  then hash to the sha256 `UPSTREAM.json` records for core's, and fails a `NOTICE` that names
+  a file the diff does not carry or leaves one out. python-validate runs it after the
   checkout, with every other pylint check off, and fails on any hit. The missing
   `__init__.py` the `python-validate.yml` row of *The three workflows* fails on is
   checked in this step, naming each file:
@@ -102,10 +103,10 @@ step runs against the consumer's own checkout.
   R7402 is on although core's own config disables it while core clears old violations,
   since a new repository has none. On each core release,
   `python scripts/pylint_upstream.py --tag <core tag>` compares core's plugin at that
-  tag with the copy. What it reports, when it exits 1, and what `--write` refuses to
-  record over are in the script's module docstring; each refusal names its fix. Port
-  what it reports, triage it in `UPSTREAM.json`, then run it again with `--write` to
-  record the tag and its hashes.
+  tag with what `UPSTREAM.json` records. What it reports, when it exits 1, and what
+  `--write` refuses to record over are in the script's module docstring; each refusal
+  names its fix. Port what it reports, triage it in `UPSTREAM.json`, then run it again
+  with `--write` to record the tag, its hashes and `CHANGES.diff`.
   `UPSTREAM.json` records the core tag and the plugin's source URL at it; each message
   core's plugin defines there, by id and symbol, either carried, with the core file it
   lives in and that file's sha256, or skipped with a reason; the sha256 of every other

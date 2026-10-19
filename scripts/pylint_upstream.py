@@ -11,17 +11,22 @@ in README.md. Given a core tag, this reports:
 - message ids core added or removed across the whole plugin.
 
 Exit 1 when it reports anything, 0 when it reports nothing. ``--write`` records the tag
-and its hashes once the changes are ported; it refuses while an added or removed
+and its hashes once the changes are ported, and writes CHANGES.diff beside UPSTREAM.json:
+every edit the copy makes to core's files at the tag, as one unified diff, which
+tests/test_pylint_copy.py undoes to get back the bytes those hashes describe. It
+refuses while an added or removed
 id or a new core file is still untriaged in UPSTREAM.json, or a recorded support
 file has vanished, and says what to do about each.
 """
 
 import argparse
 import ast
+import difflib
 import hashlib
 import http.client
 import json
 from pathlib import Path, PurePosixPath
+import re
 import ssl
 import sys
 import tarfile
@@ -62,6 +67,11 @@ DEFAULT_UPSTREAM = (
     / "ha_custom_pylint"
     / "UPSTREAM.json"
 )
+# Beside UPSTREAM.json: every edit the copy makes to core's files, as a diff.
+CHANGES = "CHANGES.diff"
+# Our package name, then core's.
+RENAME = ("ha_custom_pylint", "pylint_home_assistant")
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
 
 def _open_url(url: str) -> IO[bytes]:
@@ -176,6 +186,78 @@ def messages_in(files: dict[str, bytes]) -> dict[str, tuple[str, str]]:
 def sha256(data: bytes) -> str:
     """Return the hex sha256 of *data*."""
     return hashlib.sha256(data).hexdigest()
+
+
+def as_core(text: str) -> str:
+    """A copied file with core's package name put back, the edit every file carries."""
+    return text.replace(*RENAME)
+
+
+def changes(copy_dir: Path, files: dict[str, bytes]) -> str:
+    """The copy's edits as one unified diff against core's *files*, a file at a time.
+
+    A copied file that equals core's once the package name is put back has no entry.
+    """
+    out: list[str] = []
+    for path in sorted(files):
+        ours = copy_dir / path
+        if not ours.is_file():
+            continue
+        core = files[path].decode()
+        mine = as_core(ours.read_text())
+        if mine == core:
+            continue
+        if not (core.endswith("\n") and mine.endswith("\n")):
+            msg = f"{path} does not end in a newline, which the diff cannot carry"
+            raise ValueError(msg)
+        out += difflib.unified_diff(
+            core.splitlines(keepends=True),
+            mine.splitlines(keepends=True),
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
+        )
+    return "".join(out)
+
+
+def parse_changes(text: str) -> dict[str, list[str]]:
+    """Split a changes diff into each file's hunk lines, the file headers dropped."""
+    found: dict[str, list[str]] = {}
+    path = ""
+    for line in text.splitlines(keepends=True):
+        if line.startswith("--- a/"):
+            continue
+        if line.startswith("+++ b/"):
+            path = line.removeprefix("+++ b/").rstrip("\n")
+            found[path] = []
+        else:
+            found[path].append(line)
+    return found
+
+
+def revert(text: str, diff: list[str]) -> str:
+    """Undo one file's diff, giving back the core file it was made from.
+
+    Raises ValueError when a hunk does not match the text exactly.
+    """
+    new = text.splitlines(keepends=True)
+    hunks: list[tuple[int, list[str]]] = []
+    for line in diff:
+        if match := _HUNK.match(line):
+            start, count = int(match[1]), int(match[2] or 1)
+            hunks.append((start - 1 if count else start, []))
+        else:
+            hunks[-1][1].append(line)
+    old: list[str] = []
+    done = 0
+    for start, body in hunks:
+        before = [line[1:] for line in body if line[0] in " -"]
+        after = [line[1:] for line in body if line[0] in " +"]
+        if new[start : start + len(after)] != after:
+            msg = f"a hunk at line {start + 1} does not match the copy"
+            raise ValueError(msg)
+        old += new[done:start] + before
+        done = start + len(after)
+    return "".join(old + new[done:])
 
 
 def compare(upstream: dict[str, Any], files: dict[str, bytes]) -> list[str]:
@@ -306,7 +388,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         record = updated(upstream, files, args.tag)
         args.upstream.write_text(json.dumps(record, indent=2) + "\n")
-        print(f"{args.upstream} now records core {args.tag}.")
+        diff = args.upstream.parent / CHANGES
+        diff.write_text(changes(args.upstream.parent, files))
+        print(f"{args.upstream} and {diff} now record core {args.tag}.")
         return 0
 
     print(f"Core {args.tag} against our copy of {upstream['core_tag']}:")

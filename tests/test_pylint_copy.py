@@ -1,39 +1,34 @@
 """Hold the copy in pylint_plugins/ha_custom_pylint to core's files at the recorded tag.
 
-UPSTREAM.json records the sha256 of every core file the copy carries, at its core_tag.
-A file NOTICE does not name must hash to that value once the package name is put back;
-a file NOTICE names must not, so NOTICE lists every change and no change that is not
-there. No network: the hashes are the record of core's bytes.
+UPSTREAM.json records the sha256 of every core file the copy carries, at its core_tag,
+and CHANGES.diff every edit the copy makes to them. Each copied file, with core's
+package name put back and its CHANGES.diff hunks undone, must hash to the recorded
+value, so an edit to any file that CHANGES.diff does not carry fails here. No network:
+the hashes are the record of core's bytes.
 """
 
 import hashlib
+import importlib.util
 import json
 import pathlib
-import re
 
 import pytest
 
-_PACKAGE = (
-    pathlib.Path(__file__).resolve().parents[1] / "pylint_plugins" / "ha_custom_pylint"
+_ROOT = pathlib.Path(__file__).resolve().parents[1]
+_SPEC = importlib.util.spec_from_file_location(
+    "pylint_upstream", _ROOT / "scripts" / "pylint_upstream.py"
 )
-_UPSTREAM = json.loads((_PACKAGE / "UPSTREAM.json").read_text())
+upstream = importlib.util.module_from_spec(_SPEC)
+assert _SPEC.loader is not None
+_SPEC.loader.exec_module(upstream)
+
+_PACKAGE = upstream.DEFAULT_UPSTREAM.parent
+_UPSTREAM = json.loads(upstream.DEFAULT_UPSTREAM.read_text())
 _RECORDED = {
     record["file"]: record["sha256"] for record in _UPSTREAM["carried"].values()
 } | _UPSTREAM["support_files"]
-_NOTICE_NAMES = set(
-    re.findall(
-        r"\b(?:checkers|helpers)/[\w/]+\.py\b", (_PACKAGE / "NOTICE").read_text()
-    )
-)
-
-
-def _core_bytes(path: str) -> bytes:
-    """Return our copy of *path* with core's package name put back."""
-    return (
-        (_PACKAGE / path)
-        .read_bytes()
-        .replace(b"ha_custom_pylint", b"pylint_home_assistant")
-    )
+_CHANGES = upstream.parse_changes((_PACKAGE / upstream.CHANGES).read_text())
+_NOTICE = (_PACKAGE / "NOTICE").read_text()
 
 
 def test_every_copied_file_is_recorded() -> None:
@@ -46,26 +41,20 @@ def test_every_copied_file_is_recorded() -> None:
     assert copied == set(_RECORDED)
 
 
-def test_notice_names_only_recorded_files() -> None:
-    """Every file NOTICE names is one the copy carries."""
-    assert _NOTICE_NAMES
-    assert set(_RECORDED) >= _NOTICE_NAMES
+def test_notice_names_exactly_the_files_changes_carries() -> None:
+    """NOTICE explains every file CHANGES.diff edits, and names no unedited one."""
+    assert _CHANGES
+    assert set(_RECORDED) >= set(_CHANGES)
+    named = {path for path in _RECORDED if path in _NOTICE}
+    assert named == set(_CHANGES)
 
 
-@pytest.mark.parametrize("path", sorted(set(_RECORDED) - _NOTICE_NAMES))
-def test_unlisted_file_is_core_at_the_tag(path: str) -> None:
-    """A file NOTICE does not name is core's file at core_tag, but for the name."""
-    digest = hashlib.sha256(_core_bytes(path)).hexdigest()
-    assert digest == _RECORDED[path], (
-        f"{path} differs from core {_UPSTREAM['core_tag']}: list the change in "
-        "NOTICE or undo it"
-    )
-
-
-@pytest.mark.parametrize("path", sorted(_NOTICE_NAMES))
-def test_listed_file_differs_from_core(path: str) -> None:
-    """A file NOTICE names carries a change, so NOTICE is not stale."""
-    digest = hashlib.sha256(_core_bytes(path)).hexdigest()
-    assert digest != _RECORDED[path], (
-        f"{path} is core {_UPSTREAM['core_tag']} unchanged: drop it from NOTICE"
+@pytest.mark.parametrize("path", sorted(_RECORDED))
+def test_each_file_is_core_at_the_tag_but_for_its_changes(path: str) -> None:
+    """Undo the name and the file's CHANGES.diff hunks, and core's bytes come back."""
+    copy = upstream.as_core((_PACKAGE / path).read_text())
+    core = upstream.revert(copy, _CHANGES.get(path, []))
+    assert hashlib.sha256(core.encode()).hexdigest() == _RECORDED[path], (
+        f"{path} differs from core {_UPSTREAM['core_tag']} beyond CHANGES.diff: "
+        "undo the edit, or record it with pylint_upstream.py --write"
     )

@@ -11,6 +11,9 @@ Implementation notes in the repository README.
 What we changed
 ===============
 
+CHANGES.diff beside this file is every change below, as a diff against core's
+files at the tag UPSTREAM.json records, the package name apart.
+
 Every Python file: the import name pylint_home_assistant became
 ha_custom_pylint, so the package can sit beside core's without a clash.
 checkers/entity_unique_id_format.py differs in that one import line only,
