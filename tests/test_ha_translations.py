@@ -221,7 +221,8 @@ def test_a_missing_error_message_fails(tmp_path) -> None:
     out = _run(tmp_path, _translations(cannot_connect=True), "todo")
     assert out.startswith("rc=1"), out
     assert "`config.error.cannot_connect`" in out
-    assert "custom_components/sample/strings.json and translations/en.json" in out
+    assert "Please add to custom_components/sample/translations/en.json" in out
+    assert "strings.json" not in out
 
 
 def test_a_field_description_is_required_once_config_flow_is_done(tmp_path) -> None:
@@ -337,6 +338,8 @@ def test_a_local_copy_of_a_shared_abort_translation_fails(tmp_path) -> None:
     out = run("copy", _SHARED_TEXT)
     assert out.startswith("rc=1"), out
     assert "duplicates the one of homeassistant" in out
+    assert "from custom_components/sample/translations/en.json" in out
+    assert "strings.json" not in out
 
 
 _FLOW_SUBENTRY_ABORT = '''"""Sample config flow whose one subentry type aborts with a shared reason."""

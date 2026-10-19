@@ -132,8 +132,7 @@ async def _validate_translation(
 
     translation_errors[full_key] = (
         f"Translation not found for {component}: `{category}.{key}`. "
-        f"Please add to custom_components/{component}/strings.json and "
-        "translations/en.json"
+        f"Please add to custom_components/{component}/translations/en.json"
     )
 
 
@@ -170,8 +169,8 @@ async def _validate_abort_translation_not_duplicated(
         translation_errors[full_key] = (
             f"Translation `{category}.{key}` of {component} duplicates the one of "
             f"{translation_domain}, which translates this abort. Please remove it "
-            f"from custom_components/{component}/strings.json and "
-            f'translations/en.json, and pass translation_domain="{translation_domain}" '
+            f"from custom_components/{component}/translations/en.json, and pass "
+            f'translation_domain="{translation_domain}" '
             f"wherever {component} raises this reason itself"
         )
 

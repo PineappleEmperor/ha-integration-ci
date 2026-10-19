@@ -998,41 +998,43 @@ def test_the_future_import_is_not_demanded(repo) -> None:
     assert audit.check_antipatterns(audit.Repo(repo)) == ([], [])
 
 
-def _strings(repo, strings: dict, en: dict) -> pathlib.Path:
-    """An integration carrying strings.json and translations/en.json."""
+def _english(repo, en: dict) -> pathlib.Path:
+    """An integration carrying translations/en.json."""
     pkg = repo / "custom_components/acmedev"
     (pkg / "translations").mkdir(parents=True)
-    (pkg / "strings.json").write_text(json.dumps(strings))
     (pkg / "translations/en.json").write_text(json.dumps(en))
     return pkg
 
 
-def test_an_english_copy_that_matches_passes(repo) -> None:
-    """en.json is strings.json, key for key, in any order."""
-    _strings(
-        repo,
-        {"config": {"error": {"a": "A", "b": "B"}}},
-        {"config": {"error": {"b": "B", "a": "A"}}},
-    )
-    assert audit.check_translations_match_strings(audit.Repo(repo)) == ([], [])
+def test_the_english_file_alone_passes(repo) -> None:
+    """translations/en.json is the one file Home Assistant reads."""
+    _english(repo, {"config": {"error": {"a": "A"}}})
+    assert audit.check_translations(audit.Repo(repo)) == ([], [])
 
 
-def test_an_english_copy_that_drifted_fails(repo) -> None:
-    """A key added to strings.json alone never reaches the UI, which reads en.json."""
-    _strings(
-        repo,
-        {"config": {"error": {"a": "A", "b": "B"}}},
-        {"config": {"error": {"a": "A"}}},
-    )
-    fails, _ = audit.check_translations_match_strings(audit.Repo(repo))
-    assert len(fails) == 1 and "config.error.b" in fails[0]
+def test_a_strings_file_fails(repo) -> None:
+    """Home Assistant never reads strings.json, so a custom integration carries none."""
+    pkg = _english(repo, {"config": {"error": {"a": "A"}}})
+    (pkg / "strings.json").write_text(json.dumps({"config": {"error": {"a": "A"}}}))
+    fails, _ = audit.check_translations(audit.Repo(repo))
+    assert len(fails) == 1
+    assert "strings.json" in fails[0] and "translations/en.json" in fails[0]
 
 
-def test_a_key_reference_in_the_english_copy_fails(repo) -> None:
+def test_a_strings_file_without_an_english_file_fails(repo) -> None:
+    """The text lives in strings.json alone, where Home Assistant never looks."""
+    pkg = repo / "custom_components/acmedev"
+    pkg.mkdir(parents=True)
+    (pkg / "strings.json").write_text(json.dumps({"config": {}}))
+    fails, _ = audit.check_translations(audit.Repo(repo))
+    assert len(fails) == 1 and "strings.json" in fails[0]
+
+
+def test_a_key_reference_in_the_english_file_fails(repo) -> None:
     """Only core resolves [%key:…%]; a custom integration shows it raw."""
     ref = "[%key:common::config_flow::error::cannot_connect%]"
-    _strings(repo, {"config": {"error": {"a": ref}}}, {"config": {"error": {"a": ref}}})
-    fails, _ = audit.check_translations_match_strings(audit.Repo(repo))
+    _english(repo, {"config": {"error": {"a": ref}}})
+    fails, _ = audit.check_translations(audit.Repo(repo))
     assert len(fails) == 1 and "config.error.a" in fails[0] and "[%key:" in fails[0]
 
 

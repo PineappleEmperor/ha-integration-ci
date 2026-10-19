@@ -988,33 +988,26 @@ def _leaves(node, prefix: str = "") -> dict[str, str]:
     return {prefix.removesuffix("."): str(node)}
 
 
-def check_translations_match_strings(repo: Repo) -> Result:
-    """The English file HA serves is strings.json, with nothing left to resolve."""
+def check_translations(repo: Repo) -> Result:
+    """translations/en.json is the English text, with nothing left to resolve."""
     if not repo.cc:
         return [], []
     en_file, strings_file = repo.cc / "translations/en.json", repo.cc / "strings.json"
-    if not en_file.is_file():
-        return [], []
-    try:
-        en = _leaves(json.loads(en_file.read_text(encoding="utf-8")))
-        strings = (
-            _leaves(json.loads(strings_file.read_text(encoding="utf-8")))
-            if strings_file.is_file()
-            else None
-        )
-    except ValueError:
-        return [], []  # malformed JSON is check-json's and hassfest's to report
     en_rel = en_file.relative_to(repo.root)
     fails = []
-    if strings is not None:
-        drift = sorted(
-            k for k in en.keys() | strings.keys() if en.get(k) != strings.get(k)
+    # Home Assistant loads translations/<language>.json and never strings.json, which
+    # core turns into en.json at build time; a custom integration has no build.
+    if strings_file.is_file():
+        fails.append(
+            f"{strings_file.relative_to(repo.root)} is read by nothing — Home Assistant "
+            f"loads {en_rel}; keep the text there and delete strings.json"
         )
-        if drift:
-            fails.append(
-                f"{en_rel} differs from strings.json at {', '.join(drift[:6])} — Home "
-                f"Assistant serves {en_rel}, so copy strings.json over it"
-            )
+    if not en_file.is_file():
+        return fails, []
+    try:
+        en = _leaves(json.loads(en_file.read_text(encoding="utf-8")))
+    except ValueError:
+        return fails, []  # malformed JSON is check-json's and hassfest's to report
     refs = sorted(k for k, v in en.items() if "[%key:" in v)
     if refs:
         fails.append(
@@ -1553,7 +1546,7 @@ CHECKS = (
     check_autolabeler_title_only,
     check_drafter_categories,
     check_docstrings,
-    check_translations_match_strings,
+    check_translations,
     check_commit_hook,
     check_brand_assets,
     check_release_token,

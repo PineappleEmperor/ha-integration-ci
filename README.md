@@ -65,8 +65,8 @@ step runs against the consumer's own checkout.
   rather than at a core path; the `exception-translations` rule is read from the
   `quality_scale.yaml` of the repository's one integration, where core keys it on the
   test's own path; a message that names the file to change names
-  `custom_components/<domain>/strings.json` and `translations/en.json`, which the audit
-  holds equal, where core names `homeassistant/components/<domain>/strings.json`; and
+  `custom_components/<domain>/translations/en.json`, where core names
+  `homeassistant/components/<domain>/strings.json`; and
   a service a test registers is recognised by the consumer's own `tests/` directory. It
   keeps core's `ignore_missing_translations` and `ignore_translations_for_mock_domains`
   fixtures for a test to override. python-validate checks this repository out at
@@ -114,8 +114,8 @@ step runs against the consumer's own checkout.
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
   are the consumer's `.pre-commit-config.yaml` hooks — the ha-integration skill's template
-  lists them — so a misspelt word in the Python, or a `strings.json` whose keys are out of
-  order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`,
+  lists them — so a misspelt word in the Python, or a `translations/en.json` whose keys are
+  out of order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`,
   which would fail every push to `main` as core's CI also skips it, and the two ruff
   hooks, which the pinned ruff step already runs.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
@@ -262,9 +262,10 @@ of it, not a substitute.
   `done` or `exempt`, manifest honesty (`integration_type`,
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
-  `*.spec.ts`, a `translations/en.json` that is not `strings.json` leaf for leaf or that
-  carries a `[%key:…%]` reference (Home Assistant serves `en.json` as written, and only core
-  resolves those references, at build time), a `tests/conftest.py` that imports
+  `*.spec.ts`, a `strings.json` in the integration (Home Assistant loads
+  `translations/<language>.json` and never `strings.json`), a `translations/en.json` that
+  carries a `[%key:…%]` reference (only core resolves those references, at build time), a
+  `tests/conftest.py` that imports
   `custom_components` and pulls in `enable_custom_integrations`,
   `asyncio_mode = "auto"`, the pinned test harness (a
   warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
@@ -346,10 +347,12 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   argument of `async_get_device_diagnostics` typed `AnyDeviceEntry`.
   An abort the integration raises with `translation_domain` set to another domain,
   `homeassistant` in most cases, no longer carries a word-for-word copy of that domain's
-  text in `strings.json` and `translations/en.json`: the copy goes, or is reworded.
+  text in `translations/en.json`: the copy goes, or is reworded.
   `async_update_reload_and_abort` and `async_update_and_abort` set that domain for
   `reauth_successful` and `reconfigure_successful` when no `reason` is passed, so those two
   are where a copy usually sits.
+  `custom_components/<domain>/strings.json` is deleted, its text kept in
+  `translations/en.json`, which v2.0.0 already held equal to it.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
