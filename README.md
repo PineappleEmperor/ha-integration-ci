@@ -233,6 +233,8 @@ of it, not a substitute.
   `hacs-validate.yml`,
   `hassfest-validate.yml` and `release.yml` in an integration; `panel-bundle.yml` once
   `frontend/package.json` exists; and refuses the superseded `frontend_build.yml`.
+  `check_node_modules_ignored` requires a `.gitignore` line covering
+  `frontend/node_modules/` once `frontend/` exists.
   `check_callers` requires each caller's `uses:` to name the repository and workflow
   path it stands for (`release-flow` for `pr-checks`, `lint-pr`, `release-drafter` and
   `auto-draft-pr`, this repository for `python-validate`, `quality-audit` and `release`,
@@ -353,6 +355,7 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   are where a copy usually sits.
   `custom_components/<domain>/strings.json` is deleted, its text kept in
   `translations/en.json`, which v2.0.0 already held equal to it.
+  A repository with `frontend/` ignores `node_modules/` in its `.gitignore`.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That

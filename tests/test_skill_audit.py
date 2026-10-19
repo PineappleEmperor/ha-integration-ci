@@ -1038,6 +1038,49 @@ def test_a_key_reference_in_the_english_file_fails(repo) -> None:
     assert len(fails) == 1 and "config.error.a" in fails[0] and "[%key:" in fails[0]
 
 
+def test_a_panel_repo_must_ignore_node_modules(repo) -> None:
+    """An npm install under frontend/ otherwise offers the whole tree for staging."""
+    (repo / "frontend").mkdir()
+    (repo / ".gitignore").write_text("__pycache__/\n# node_modules/\n!node_modules/\n")
+    fails, _ = audit.check_node_modules_ignored(audit.Repo(repo))
+    assert len(fails) == 1 and "node_modules" in fails[0]
+
+    (repo / ".gitignore").unlink()
+    fails, _ = audit.check_node_modules_ignored(audit.Repo(repo))
+    assert len(fails) == 1 and "node_modules" in fails[0]
+
+
+def test_a_root_anchored_node_modules_does_not_cover_the_panel(repo) -> None:
+    """A leading slash anchors to the root; npm installs under frontend/."""
+    (repo / "frontend").mkdir()
+    (repo / ".gitignore").write_text("/node_modules/\n")
+    fails, _ = audit.check_node_modules_ignored(audit.Repo(repo))
+    assert len(fails) == 1 and "node_modules" in fails[0]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "node_modules/",
+        "node_modules",
+        "**/node_modules",
+        "frontend/node_modules/",
+        "/frontend/node_modules",
+    ],
+)
+def test_each_spelling_that_ignores_node_modules_passes(repo, line: str) -> None:
+    """Each pattern git reads as covering frontend/node_modules/."""
+    (repo / "frontend").mkdir()
+    (repo / ".gitignore").write_text(f"__pycache__/\n{line}\n")
+    assert audit.check_node_modules_ignored(audit.Repo(repo)) == ([], [])
+
+
+def test_a_repo_without_a_panel_is_not_asked_to_ignore_node_modules(repo) -> None:
+    """No frontend/, no npm install, nothing to ignore."""
+    (repo / ".gitignore").write_text("__pycache__/\n")
+    assert audit.check_node_modules_ignored(audit.Repo(repo)) == ([], [])
+
+
 def _integration(repo, **files: str) -> pathlib.Path:
     """A minimal integration package, plus any extra files by name."""
     pkg = repo / "custom_components/acmedev"

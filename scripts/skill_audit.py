@@ -276,6 +276,25 @@ def check_canonical_files(repo: Repo) -> Result:
     return fails, warns
 
 
+def check_node_modules_ignored(repo: Repo) -> Result:
+    """A panel's npm install must not be offered for staging."""
+    if not repo.exists("frontend"):
+        return [], []
+    for line in repo.text(".gitignore").splitlines():
+        pattern = line.strip().rstrip("/")
+        if not pattern or pattern.startswith(("#", "!")):
+            continue
+        # git anchors a pattern holding a slash to the root; npm installs in frontend/.
+        if pattern.removeprefix("**/") == "node_modules" or (
+            pattern.lstrip("/").removeprefix("**/") == "frontend/node_modules"
+        ):
+            return [], []
+    return [
+        ".gitignore does not ignore node_modules/ (frontend/ exists, so an npm install "
+        "puts the whole tree one `git add .` from a commit)"
+    ], []
+
+
 def check_callers(repo: Repo) -> Result:
     """Each caller must call the workflow it stands for, in the repository that owns it.
 
@@ -1523,6 +1542,7 @@ def check_dependency_graph(repo: Repo) -> Result:
 
 CHECKS = (
     check_canonical_files,
+    check_node_modules_ignored,
     check_callers,
     check_no_tracked_artefacts,
     check_single_body_writer,
