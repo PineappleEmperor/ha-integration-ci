@@ -31,8 +31,8 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
-  Ruff, mypy, pylint and prek are pinned to 0.16.3, 2.3.1, 4.0.7 and 0.2.28, with
-  pylint's astroid at 4.0.4, the versions Home Assistant core 2026.9.4 pins, because the
+  Ruff, mypy, pylint and prek are pinned to 0.16.9, 2.3.1, 4.0.8 and 0.5.4, with
+  pylint's astroid at 4.0.4, the versions Home Assistant core 2026.10.2 pins, because the
   consumer's rule set, `mypy.ini`, pylint rules and hooks are derived from core's and a
   newer tool reports errors core has not met yet. A repository without
   `requirements.test.txt` gets `homeassistant` pinned too, to the `core_tag` in
@@ -53,15 +53,20 @@ step runs against the consumer's own checkout.
   it is half of every consumer's required context: swapping a tool must not rename the
   check.
 - **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
-  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.9.0.
+  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.10.2.
   pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
   file, so without the port a flow error, abort, repair issue, action or action exception
   whose text is missing from `translations/en.json` passes here and fails in core; a user
-  then sees the raw key. The port changes four things only: the `config-flow` rule is read
-  from the `quality_scale.yaml` beside the loaded integration rather than at a core path;
-  the `exception-translations` rule is read from the `quality_scale.yaml` of the
-  repository's one integration, where core keys it on the test's own path; the message
-  names both `strings.json` and `translations/en.json`, which the audit holds equal; and
+  then sees the raw key. An abort another domain translates, `homeassistant` in most
+  cases, also fails here as it does in core when the integration copies that domain's text
+  word for word into its own translations; one worded its own way passes, and so does an
+  `Unauthorized` action error, which core exempts. The port changes four things only: the
+  `config-flow` rule is read from the `quality_scale.yaml` beside the loaded integration
+  rather than at a core path; the `exception-translations` rule is read from the
+  `quality_scale.yaml` of the repository's one integration, where core keys it on the
+  test's own path; a message that names the file to change names
+  `custom_components/<domain>/translations/en.json`, where core names
+  `homeassistant/components/<domain>/strings.json`; and
   a service a test registers is recognised by the consumer's own `tests/` directory. It
   keeps core's `ignore_missing_translations` and `ignore_translations_for_mock_domains`
   fixtures for a test to override. python-validate checks this repository out at
@@ -79,13 +84,16 @@ step runs against the consumer's own checkout.
   exist, which it reads as nothing having run. Other
   modules carry no threshold here. pytest-cov arrives with the pinned test harness.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
-  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.9.4, the release
+  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.10.2, the release
   consumers test against, under Apache-2.0 with its `NOTICE`. Core's
   plugin decides what an integration is by the module name `homeassistant.components.<domain>`,
   which a custom integration never has, so run as published it stays silent on most of
   one, and its README says it is not for external use. The copy keeps core's checkers,
   message ids and symbols, so a diff against core stays readable, and changes only what
-  `NOTICE` lists. python-validate runs it after the
+  `NOTICE` lists, each change recorded in `CHANGES.diff` beside it: `tests/test_pylint_copy.py`
+  undoes the package name and that diff on every copied file and fails any that does not
+  then hash to the sha256 `UPSTREAM.json` records for core's, and fails a `NOTICE` that names
+  a file the diff does not carry or leaves one out. python-validate runs it after the
   checkout, with every other pylint check off, and fails on any hit. The missing
   `__init__.py` the `python-validate.yml` row of *The three workflows* fails on is
   checked in this step, naming each file:
@@ -95,10 +103,10 @@ step runs against the consumer's own checkout.
   R7402 is on although core's own config disables it while core clears old violations,
   since a new repository has none. On each core release,
   `python scripts/pylint_upstream.py --tag <core tag>` compares core's plugin at that
-  tag with the copy. What it reports, when it exits 1, and what `--write` refuses to
-  record over are in the script's module docstring; each refusal names its fix. Port
-  what it reports, triage it in `UPSTREAM.json`, then run it again with `--write` to
-  record the tag and its hashes.
+  tag with what `UPSTREAM.json` records. What it reports, when it exits 1, and what
+  `--write` refuses to record over are in the script's module docstring; each refusal
+  names its fix. Port what it reports, triage it in `UPSTREAM.json`, then run it again
+  with `--write` to record the tag, its hashes and `CHANGES.diff`.
   `UPSTREAM.json` records the core tag and the plugin's source URL at it; each message
   core's plugin defines there, by id and symbol, either carried, with the core file it
   lives in and that file's sha256, or skipped with a reason; the sha256 of every other
@@ -107,8 +115,8 @@ step runs against the consumer's own checkout.
   is skipped by `git commit -n` and by any edit made on GitHub; core runs its own through
   `prek` in CI for the same reason, and the step uses the prek action core pins. The hooks
   are the consumer's `.pre-commit-config.yaml` hooks — the ha-integration skill's template
-  lists them — so a misspelt word in the Python, or a `strings.json` whose keys are out of
-  order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`,
+  lists them — so a misspelt word in the Python, or a `translations/en.json` whose keys are
+  out of order, fails here and not first in review. `PREK_SKIP` drops `no-commit-to-branch`,
   which would fail every push to `main` as core's CI also skips it, and the two ruff
   hooks, which the pinned ruff step already runs.
 - **quality-audit.yml** sets up the Python floor before running the scripts because the
@@ -249,15 +257,19 @@ of it, not a substitute.
   APIs, bare `# type: ignore`, multi-line docstrings on functions and classes under
   `custom_components/` (module docstrings are exempt, a missing docstring is not checked,
   and a consumer's own `scripts/` and `tests/` are not read), a tracked compiled artefact
-  (a `.py[cod]` file or a `__pycache__`, per-interpreter bytes that churn every diff), the
+  (a `.py[cod]` file or a `__pycache__`, per-interpreter bytes that churn every diff),
+  `frontend/node_modules/` left unignored once `frontend/` exists (asked of
+  `git check-ignore`, with any global excludes file left out, and a warning when git
+  cannot answer), the
   canonical `quality_scale.yaml` rule set and — since hassfest walks a claimed tier for
   core integrations only — every rule at or below the manifest's `quality_scale` marked
   `done` or `exempt`, manifest honesty (`integration_type`,
   `issue_tracker`, `config_flow` with a `config_flow.py`), a `done` rule with no `tests/`
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
-  `*.spec.ts`, a `translations/en.json` that is not `strings.json` leaf for leaf or that
-  carries a `[%key:…%]` reference (Home Assistant serves `en.json` as written, and only core
-  resolves those references, at build time), a `tests/conftest.py` that imports
+  `*.spec.ts`, a `strings.json` in the integration (Home Assistant loads
+  `translations/<language>.json` and never `strings.json`), a `translations/en.json` that
+  carries a `[%key:…%]` reference (only core resolves those references, at build time), a
+  `tests/conftest.py` that imports
   `custom_components` and pulls in `enable_custom_integrations`,
   `asyncio_mode = "auto"`, the pinned test harness (a
   warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
@@ -333,6 +345,19 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   `translations/en.json`, as does a `data_description` for every flow field once
   `config-flow` is `done`, and a `name` and `description` for every action the
   integration registers; and the integration and its tests pass the pylint rules.
+- **v3.0.0's edits.** The integration and its tests pass the pylint rules core added or
+  changed at 2026.10: W7434 to W7437, which check menu steps in a config flow, JSON test
+  fixtures and the colour modes of a light, and E7402, which now wants the `device`
+  argument of `async_get_device_diagnostics` typed `AnyDeviceEntry`.
+  An abort the integration raises with `translation_domain` set to another domain,
+  `homeassistant` in most cases, no longer carries a word-for-word copy of that domain's
+  text in `translations/en.json`: the copy goes, or is reworded.
+  `async_update_reload_and_abort` and `async_update_and_abort` set that domain for
+  `reauth_successful` and `reconfigure_successful` when no `reason` is passed, so those two
+  are where a copy usually sits.
+  `custom_components/<domain>/strings.json` is deleted, its text kept in
+  `translations/en.json`, which v2.0.0 already held equal to it.
+  A repository with `frontend/` ignores `node_modules/` in its `.gitignore`.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That

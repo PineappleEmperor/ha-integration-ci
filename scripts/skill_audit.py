@@ -276,6 +276,44 @@ def check_canonical_files(repo: Repo) -> Result:
     return fails, warns
 
 
+def check_node_modules_ignored(repo: Repo) -> Result:
+    """A panel's npm install must not be offered for staging."""
+    if not repo.exists("frontend"):
+        return [], []
+    # Git's own answer, from the repository's ignore files alone: a user's global
+    # excludes file would pass a repository that offers the tree to everyone else.
+    try:
+        probe = subprocess.run(
+            [
+                "git",
+                "-c",
+                "core.excludesFile=/dev/null",
+                "check-ignore",
+                "-q",
+                "--no-index",
+                "frontend/node_modules/package.json",
+            ],
+            cwd=repo.root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        probe = None
+    if probe is not None and probe.returncode == 0:
+        return [], []
+    if probe is not None and probe.returncode == 1:
+        return [
+            "git does not ignore frontend/node_modules/ (frontend/ exists, so an npm "
+            "install puts the whole tree one `git add .` from a commit): add "
+            "node_modules/ to .gitignore"
+        ], []
+    return [], [
+        "git could not say whether frontend/node_modules/ is ignored — NOT CHECKED, "
+        "not passed"
+    ]
+
+
 def check_callers(repo: Repo) -> Result:
     """Each caller must call the workflow it stands for, in the repository that owns it.
 
@@ -988,33 +1026,26 @@ def _leaves(node, prefix: str = "") -> dict[str, str]:
     return {prefix.removesuffix("."): str(node)}
 
 
-def check_translations_match_strings(repo: Repo) -> Result:
-    """The English file HA serves is strings.json, with nothing left to resolve."""
+def check_translations(repo: Repo) -> Result:
+    """translations/en.json is the English text, with nothing left to resolve."""
     if not repo.cc:
         return [], []
     en_file, strings_file = repo.cc / "translations/en.json", repo.cc / "strings.json"
-    if not en_file.is_file():
-        return [], []
-    try:
-        en = _leaves(json.loads(en_file.read_text(encoding="utf-8")))
-        strings = (
-            _leaves(json.loads(strings_file.read_text(encoding="utf-8")))
-            if strings_file.is_file()
-            else None
-        )
-    except ValueError:
-        return [], []  # malformed JSON is check-json's and hassfest's to report
     en_rel = en_file.relative_to(repo.root)
     fails = []
-    if strings is not None:
-        drift = sorted(
-            k for k in en.keys() | strings.keys() if en.get(k) != strings.get(k)
+    # Home Assistant loads translations/<language>.json and never strings.json; tools
+    # still read it — hassfest validates it, and the pylint copy prefers it to en.json.
+    if strings_file.is_file():
+        fails.append(
+            f"Home Assistant never loads {strings_file.relative_to(repo.root)} — it "
+            f"loads {en_rel}; keep the text there and delete strings.json"
         )
-        if drift:
-            fails.append(
-                f"{en_rel} differs from strings.json at {', '.join(drift[:6])} — Home "
-                f"Assistant serves {en_rel}, so copy strings.json over it"
-            )
+    if not en_file.is_file():
+        return fails, []
+    try:
+        en = _leaves(json.loads(en_file.read_text(encoding="utf-8")))
+    except ValueError:
+        return fails, []  # malformed JSON is check-json's and hassfest's to report
     refs = sorted(k for k, v in en.items() if "[%key:" in v)
     if refs:
         fails.append(
@@ -1530,6 +1561,7 @@ def check_dependency_graph(repo: Repo) -> Result:
 
 CHECKS = (
     check_canonical_files,
+    check_node_modules_ignored,
     check_callers,
     check_no_tracked_artefacts,
     check_single_body_writer,
@@ -1553,7 +1585,7 @@ CHECKS = (
     check_autolabeler_title_only,
     check_drafter_categories,
     check_docstrings,
-    check_translations_match_strings,
+    check_translations,
     check_commit_hook,
     check_brand_assets,
     check_release_token,

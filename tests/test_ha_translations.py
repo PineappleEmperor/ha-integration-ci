@@ -178,6 +178,7 @@ def _run(
     config_flow_rule: str,
     *,
     init: str = _INIT,
+    flow: str = _FLOW,
     case: str = _CASE,
     more_rules: str = "",
 ) -> str:
@@ -186,7 +187,7 @@ def _run(
     (pkg / "translations").mkdir(parents=True)
     (pkg / "manifest.json").write_text(json.dumps(_MANIFEST))
     (pkg / "__init__.py").write_text(init)
-    (pkg / "config_flow.py").write_text(_FLOW)
+    (pkg / "config_flow.py").write_text(flow)
     (pkg / "translations/en.json").write_text(json.dumps(translations))
     (pkg / "quality_scale.yaml").write_text(
         f"rules:\n  config-flow: {config_flow_rule}\n{more_rules}"
@@ -220,7 +221,8 @@ def test_a_missing_error_message_fails(tmp_path) -> None:
     out = _run(tmp_path, _translations(cannot_connect=True), "todo")
     assert out.startswith("rc=1"), out
     assert "`config.error.cannot_connect`" in out
-    assert "custom_components/sample/strings.json and translations/en.json" in out
+    assert "Please add to custom_components/sample/translations/en.json" in out
+    assert "strings.json" not in out
 
 
 def test_a_field_description_is_required_once_config_flow_is_done(tmp_path) -> None:
@@ -256,3 +258,165 @@ def test_an_untranslated_action_error_fails_once_exception_translations_is_done(
     out = run("done")
     assert out.startswith("rc=1"), out
     assert "Found untranslated HomeAssistantError exception: It failed" in out
+
+
+def test_an_unauthorized_action_error_needs_no_translation(tmp_path) -> None:
+    """Core exempts Unauthorized from the translation check."""
+    translations = {
+        **_translations(),
+        "services": {"boom": {"name": "Boom", "description": "Always fails."}},
+    }
+    init = _INIT_WITH_ACTION.replace(
+        "import HomeAssistantError", "import HomeAssistantError, Unauthorized"
+    ).replace('raise HomeAssistantError("It failed")', "raise Unauthorized")
+    out = _run(
+        tmp_path,
+        translations,
+        "done",
+        init=init,
+        case=_ACTION_CASE,
+        more_rules="  exception-translations: done\n",
+    )
+    assert out.startswith("rc=0"), out
+
+
+_FLOW_SHARED_ABORT = '''"""Sample config flow that aborts with a shared reason."""
+
+from typing import Any
+
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN
+
+
+class SampleConfigFlow(ConfigFlow, domain="sample"):
+    """Abort at once, with the reason the homeassistant domain translates."""
+
+    VERSION = 1
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Abort."""
+        return self.async_abort(
+            reason="single_instance_allowed", translation_domain=HOMEASSISTANT_DOMAIN
+        )
+'''
+
+_ABORT_CASE = '''"""The flow aborts."""
+
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+
+
+async def test_abort(hass: HomeAssistant) -> None:
+    """Starting the flow aborts it."""
+    result = await hass.config_entries.flow.async_init(
+        "sample", context={"source": "user"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+'''
+
+_SHARED_TEXT = "Already configured. Only a single configuration is possible."
+
+
+def test_a_local_copy_of_a_shared_abort_translation_fails(tmp_path) -> None:
+    """A local copy of the homeassistant wording fails; wording of its own is kept."""
+
+    def run(name: str, text: str) -> str:
+        translations = {
+            "config": {"abort": {"single_instance_allowed": text}},
+        }
+        return _run(
+            tmp_path / name,
+            translations,
+            "done",
+            flow=_FLOW_SHARED_ABORT,
+            case=_ABORT_CASE,
+        )
+
+    assert run("own", "Only one Sample can be set up.").startswith("rc=0")
+    out = run("copy", _SHARED_TEXT)
+    assert out.startswith("rc=1"), out
+    assert "duplicates the one of homeassistant" in out
+    assert "from custom_components/sample/translations/en.json" in out
+    assert "strings.json" not in out
+
+
+_FLOW_SUBENTRY_ABORT = '''"""Sample config flow whose one subentry type aborts with a shared reason."""
+
+from typing import Any
+
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
+)
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, callback
+
+
+class ThingFlow(ConfigSubentryFlow):
+    """Abort at once."""
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Abort."""
+        return self.async_abort(
+            reason="reconfigure_successful", translation_domain=HOMEASSISTANT_DOMAIN
+        )
+
+
+class SampleConfigFlow(ConfigFlow, domain="sample"):
+    """Offer one subentry type."""
+
+    VERSION = 1
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        """The one type."""
+        return {"thing": ThingFlow}
+'''
+
+_SUBENTRY_ABORT_CASE = '''"""The subentry flow aborts."""
+
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+
+async def test_subentry_abort(hass: HomeAssistant) -> None:
+    """Starting the subentry flow aborts it."""
+    entry = MockConfigEntry(domain="sample")
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "thing"), context={"source": "user"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+'''
+
+
+def test_a_local_copy_of_a_shared_subentry_abort_translation_fails(tmp_path) -> None:
+    """A subentry abort is checked against the homeassistant config section."""
+
+    def run(name: str, text: str) -> str:
+        translations = {
+            "config_subentries": {
+                "thing": {"abort": {"reconfigure_successful": text}},
+            },
+        }
+        return _run(
+            tmp_path / name,
+            translations,
+            "done",
+            flow=_FLOW_SUBENTRY_ABORT,
+            case=_SUBENTRY_ABORT_CASE,
+        )
+
+    assert run("own", "Thing updated.").startswith("rc=0")
+    out = run("copy", "Reconfiguration was successful")
+    assert out.startswith("rc=1"), out
+    assert "config_subentries.thing.abort.reconfigure_successful" in out

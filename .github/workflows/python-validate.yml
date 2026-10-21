@@ -27,11 +27,11 @@ jobs:
 
       - name: Install
         run: |
-          uv pip install --system ruff==0.16.3 mypy==2.3.1 pylint==4.0.7 astroid==4.0.4
+          uv pip install --system ruff==0.16.9 mypy==2.3.1 pylint==4.0.8 astroid==4.0.4
           if [ -f requirements.test.txt ]; then
             uv pip install --system -r requirements.test.txt
           else
-            uv pip install --system homeassistant==2026.9.4
+            uv pip install --system homeassistant==2026.10.2
           fi
 
       - name: Ruff
@@ -46,7 +46,7 @@ jobs:
         if: hashFiles('.pre-commit-config.yaml') != ''
         uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
         with:
-          prek-version: 0.2.28
+          prek-version: 0.5.4
         env:
           PREK_SKIP: no-commit-to-branch,ruff-check,ruff-format
 

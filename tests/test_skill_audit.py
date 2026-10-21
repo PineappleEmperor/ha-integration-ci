@@ -998,42 +998,114 @@ def test_the_future_import_is_not_demanded(repo) -> None:
     assert audit.check_antipatterns(audit.Repo(repo)) == ([], [])
 
 
-def _strings(repo, strings: dict, en: dict) -> pathlib.Path:
-    """An integration carrying strings.json and translations/en.json."""
+def _english(repo, en: dict) -> pathlib.Path:
+    """An integration carrying translations/en.json."""
     pkg = repo / "custom_components/acmedev"
     (pkg / "translations").mkdir(parents=True)
-    (pkg / "strings.json").write_text(json.dumps(strings))
     (pkg / "translations/en.json").write_text(json.dumps(en))
     return pkg
 
 
-def test_an_english_copy_that_matches_passes(repo) -> None:
-    """en.json is strings.json, key for key, in any order."""
-    _strings(
-        repo,
-        {"config": {"error": {"a": "A", "b": "B"}}},
-        {"config": {"error": {"b": "B", "a": "A"}}},
-    )
-    assert audit.check_translations_match_strings(audit.Repo(repo)) == ([], [])
+def test_the_english_file_alone_passes(repo) -> None:
+    """translations/en.json is the one file Home Assistant reads."""
+    _english(repo, {"config": {"error": {"a": "A"}}})
+    assert audit.check_translations(audit.Repo(repo)) == ([], [])
 
 
-def test_an_english_copy_that_drifted_fails(repo) -> None:
-    """A key added to strings.json alone never reaches the UI, which reads en.json."""
-    _strings(
-        repo,
-        {"config": {"error": {"a": "A", "b": "B"}}},
-        {"config": {"error": {"a": "A"}}},
-    )
-    fails, _ = audit.check_translations_match_strings(audit.Repo(repo))
-    assert len(fails) == 1 and "config.error.b" in fails[0]
+def test_a_strings_file_fails(repo) -> None:
+    """Home Assistant never loads strings.json, so a custom integration carries none.
+
+    Tools do read it — hassfest validates it, and the pylint copy reads it before
+    translations/en.json — so the message says what Home Assistant does, not that
+    nothing reads it.
+    """
+    pkg = _english(repo, {"config": {"error": {"a": "A"}}})
+    (pkg / "strings.json").write_text(json.dumps({"config": {"error": {"a": "A"}}}))
+    fails, _ = audit.check_translations(audit.Repo(repo))
+    assert len(fails) == 1
+    assert "strings.json" in fails[0] and "translations/en.json" in fails[0]
+    assert "Home Assistant never loads" in fails[0]
+    assert "read by nothing" not in fails[0]
 
 
-def test_a_key_reference_in_the_english_copy_fails(repo) -> None:
+def test_a_strings_file_without_an_english_file_fails(repo) -> None:
+    """The text lives in strings.json alone, where Home Assistant never looks."""
+    pkg = repo / "custom_components/acmedev"
+    pkg.mkdir(parents=True)
+    (pkg / "strings.json").write_text(json.dumps({"config": {}}))
+    fails, _ = audit.check_translations(audit.Repo(repo))
+    assert len(fails) == 1 and "strings.json" in fails[0]
+
+
+def test_a_key_reference_in_the_english_file_fails(repo) -> None:
     """Only core resolves [%key:…%]; a custom integration shows it raw."""
     ref = "[%key:common::config_flow::error::cannot_connect%]"
-    _strings(repo, {"config": {"error": {"a": ref}}}, {"config": {"error": {"a": ref}}})
-    fails, _ = audit.check_translations_match_strings(audit.Repo(repo))
+    _english(repo, {"config": {"error": {"a": ref}}})
+    fails, _ = audit.check_translations(audit.Repo(repo))
     assert len(fails) == 1 and "config.error.a" in fails[0] and "[%key:" in fails[0]
+
+
+def _panel_repo(root: pathlib.Path, ignores: dict[str, str]) -> audit.Repo:
+    """A git repository with frontend/ and the given ignore files, by path."""
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    (root / "frontend").mkdir(exist_ok=True)
+    for rel, text in ignores.items():
+        (root / rel).write_text(text)
+    return audit.Repo(root)
+
+
+@pytest.mark.parametrize(
+    "ignores",
+    [
+        {},
+        {".gitignore": "__pycache__/\n# node_modules/\n"},
+        {".gitignore": "/node_modules/\n"},
+        {".gitignore": "node_modules/\n!node_modules/\n"},
+        {".gitignore": "node_modules/\n!frontend/node_modules\n"},
+        {".gitignore": "  node_modules\n"},
+    ],
+)
+def test_a_panel_repo_git_does_not_ignore_node_modules_in_fails(repo, ignores) -> None:
+    """Git is the judge: a comment, a root anchor, a negation, a padded line."""
+    fails, warns = audit.check_node_modules_ignored(_panel_repo(repo, ignores))
+    assert len(fails) == 1 and "frontend/node_modules/" in fails[0]
+    assert warns == []
+
+
+@pytest.mark.parametrize(
+    "ignores",
+    [
+        {".gitignore": "node_modules/\n"},
+        {".gitignore": "node_modules\n"},
+        {".gitignore": "**/node_modules\n"},
+        {".gitignore": "/**/node_modules\n"},
+        {".gitignore": "*/node_modules\n"},
+        {".gitignore": "frontend/node_modules/\n"},
+        {".gitignore": "/frontend/node_modules\n"},
+        {".gitignore": "frontend/**/node_modules\n"},
+        {".gitignore": "frontend/node_modules/**\n"},
+        {".gitignore": "node_module*\n"},
+        {"frontend/.gitignore": "node_modules/\n"},
+    ],
+)
+def test_a_panel_repo_git_ignores_node_modules_in_passes(repo, ignores) -> None:
+    """Every spelling git honours, in the root .gitignore or in frontend/'s own."""
+    assert audit.check_node_modules_ignored(_panel_repo(repo, ignores)) == ([], [])
+
+
+def test_without_git_the_node_modules_check_says_not_checked(repo) -> None:
+    """Outside a repository git cannot answer, and the verdict says so."""
+    (repo / "frontend").mkdir()
+    (repo / ".gitignore").write_text("node_modules/\n")
+    fails, warns = audit.check_node_modules_ignored(audit.Repo(repo))
+    assert fails == []
+    assert len(warns) == 1 and "NOT CHECKED" in warns[0]
+
+
+def test_a_repo_without_a_panel_is_not_asked_to_ignore_node_modules(repo) -> None:
+    """No frontend/, no npm install, nothing to ignore."""
+    (repo / ".gitignore").write_text("__pycache__/\n")
+    assert audit.check_node_modules_ignored(audit.Repo(repo)) == ([], [])
 
 
 def _integration(repo, **files: str) -> pathlib.Path:

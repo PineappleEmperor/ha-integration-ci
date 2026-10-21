@@ -250,6 +250,40 @@ def test_a_triaged_new_id_is_recorded_by_write(tmp_path, capsys) -> None:
     assert _run(path, core) == 0
 
 
+def test_write_records_the_copy_s_edits_as_a_diff(tmp_path, capsys) -> None:
+    """CHANGES.diff carries each edited file, and undoing it gives core's bytes back."""
+    path = _recorded(tmp_path, capsys)
+    assert not (tmp_path / upstream.CHANGES).read_text(), "no copy yet, no edits"
+    (tmp_path / "checkers").mkdir()
+    (tmp_path / "checkers/a.py").write_text(
+        _CHECKER_A.replace("The first rule.", "The first rule, for us.")
+    )
+    (tmp_path / "checkers/b.py").write_text(_CHECKER_B)
+    assert _run(path, _core(tmp_path / "new"), "--write") == 0
+    diff = (tmp_path / upstream.CHANGES).read_text()
+    parsed = upstream.parse_changes(diff)
+    assert set(parsed) == {"checkers/a.py"}, "an unedited file carries no entry"
+    copy = upstream.as_core((tmp_path / "checkers/a.py").read_text())
+    assert upstream.revert(copy, parsed["checkers/a.py"]) == _CHECKER_A
+
+
+def test_a_diff_that_does_not_match_the_copy_is_refused() -> None:
+    """A copy edited beyond its recorded hunk cannot be turned back into core's file."""
+    core = "one\ntwo\nthree\nfour\n"
+    diff = "".join(
+        upstream.difflib.unified_diff(
+            core.splitlines(keepends=True),
+            "one\nTWO\nthree\nfour\n".splitlines(keepends=True),
+            fromfile="a/x.py",
+            tofile="b/x.py",
+        )
+    )
+    hunks = upstream.parse_changes(diff)["x.py"]
+    assert upstream.revert("one\nTWO\nthree\nfour\n", hunks) == core
+    with pytest.raises(ValueError, match="does not match"):
+        upstream.revert("one\nTWO\nTHREE\nfour\n", hunks)
+
+
 def _tarball(files: dict[str, str]) -> bytes:
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
