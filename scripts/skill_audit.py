@@ -1092,6 +1092,41 @@ def check_commit_hook(repo: Repo) -> Result:
     return fails, warns
 
 
+# What a shell line runs: its quoted strings and its comment (a `#` that starts a word)
+# are cut out first, since text in a message or a comment runs nothing. What is left
+# counts when it holds `prek run` as two words, wherever they sit in the line.
+_QUOTED_OR_COMMENT = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|(?:^|(?<=\s))#.*$")
+_PREK_RUN = re.compile(r"\bprek\s+run\b")
+
+
+def check_precommit_wrapper(repo: Repo) -> Result:
+    """The hooks config runs on commit only through a wrapper that calls prek."""
+    if not repo.exists(".pre-commit-config.yaml"):
+        return [], []  # absence is check_canonical_files' verdict, reported once
+    fix = (
+        "the wrapper is under *Step 6: Copy the config and CI files* in the "
+        "ha-integration skill's reference/scaffold.md"
+    )
+    hook = repo.root / ".githooks/pre-commit"
+    if not hook.is_file():
+        return [f"missing .githooks/pre-commit, so no hook runs on commit — {fix}"], []
+    if not os.access(hook, os.X_OK):
+        return [".githooks/pre-commit is not executable (chmod +x)"], []
+    # pre-commit runs git without GIT_CONFIG_PARAMETERS (no_git_env() in its git.py),
+    # which is where Claude Code's sandbox passes its proxy login, so in an agent's
+    # session it cannot fetch the hooks; prek reads the same config and can.
+    runs = [
+        _QUOTED_OR_COMMENT.sub("", line)
+        for line in hook.read_text(encoding="utf-8", errors="replace").splitlines()
+    ]
+    if not any(_PREK_RUN.search(line) for line in runs):
+        return [
+            f".githooks/pre-commit does not call `prek run`, so the hooks fail to "
+            f"install in an agent's sandbox — {fix}"
+        ], []
+    return [], []
+
+
 def check_brand_assets(repo: Repo) -> Result:
     """icon.png is the one brand file HACS gates on; every other rule is quality.
 
@@ -1587,6 +1622,7 @@ CHECKS = (
     check_docstrings,
     check_translations,
     check_commit_hook,
+    check_precommit_wrapper,
     check_brand_assets,
     check_release_token,
     check_required_status_checks,

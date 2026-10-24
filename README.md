@@ -290,6 +290,11 @@ of it, not a substitute.
   answers: a probe that cannot read the graph is the failure the check exists to catch.
 - **The commit hook.** Present, executable, enforcing the Conventional Commit subject
   shape and rejecting editorialising subjects, and `core.hooksPath` pointing at it.
+  Wherever `.pre-commit-config.yaml` exists, `.githooks/pre-commit` too: present,
+  executable, and running `prek run` outside any quoted text or comment. pre-commit runs
+  git without `GIT_CONFIG_PARAMETERS` (`no_git_env()` in its `git.py`), which is where
+  Claude Code's sandbox passes its proxy login, so in an agent's session it cannot fetch
+  the hooks.
 
 `version_sync.py` compares the Python version across every workflow that sets one up in
 the consumer's own `.github/workflows/`, the three reusable workflows in the
@@ -358,6 +363,9 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
   `custom_components/<domain>/strings.json` is deleted, its text kept in
   `translations/en.json`, which v2.0.0 already held equal to it.
   A repository with `frontend/` ignores `node_modules/` in its `.gitignore`.
+- **v4.0.0's edits.** `.githooks/pre-commit` calls `prek run` in place of
+  `pre-commit run`; the wrapper is under *Step 6: Copy the config and CI files* in the
+  ha-integration skill's `reference/scaffold.md`.
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
