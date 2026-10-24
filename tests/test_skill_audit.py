@@ -407,6 +407,110 @@ def test_hook_without_the_subject_guards_fails(tmp_path) -> None:
     assert fails == []
 
 
+_PRE_COMMIT_WRAPPER = (
+    "#!/bin/sh\n"
+    "if ! command -v pre-commit >/dev/null 2>&1; then\n"
+    '  echo "pre-commit is not installed: pip install pre-commit" >&2\n'
+    "  exit 1\n"
+    "fi\n"
+    "exec pre-commit run\n"
+)
+_PREK_WRAPPER = (
+    "#!/bin/sh\n"
+    "if ! command -v prek >/dev/null 2>&1; then\n"
+    '  echo "prek is not installed: uv tool install prek" >&2\n'
+    "  exit 1\n"
+    "fi\n"
+    "exec prek run\n"
+)
+
+
+def _wrapper(root: pathlib.Path, text: str | None, mode: int = 0o755) -> None:
+    """A repo carrying the hooks config, and the wrapper `text` unless it is None."""
+    (root / ".pre-commit-config.yaml").write_text("repos: []\n")
+    if text is None:
+        return
+    (root / ".githooks").mkdir(exist_ok=True)
+    hook = root / ".githooks/pre-commit"
+    hook.write_text(text)
+    hook.chmod(mode)
+
+
+def test_a_repo_without_a_hooks_config_is_not_asked_for_the_wrapper(tmp_path) -> None:
+    """No hooks to run; the missing config is check_canonical_files' verdict."""
+    assert audit.check_precommit_wrapper(audit.Repo(tmp_path)) == ([], [])
+
+
+def test_a_missing_wrapper_fails(tmp_path) -> None:
+    """The hooks config alone runs nothing on commit."""
+    _wrapper(tmp_path, None)
+    fails, _ = audit.check_precommit_wrapper(audit.Repo(tmp_path))
+    assert len(fails) == 1
+    assert "missing .githooks/pre-commit" in fails[0] and "scaffold.md" in fails[0]
+
+
+def test_a_wrapper_that_cannot_run_fails(tmp_path) -> None:
+    """Git skips a hook without the executable bit, silently."""
+    _wrapper(tmp_path, _PREK_WRAPPER, 0o644)
+    fails, _ = audit.check_precommit_wrapper(audit.Repo(tmp_path))
+    assert len(fails) == 1 and "not executable" in fails[0]
+
+
+def test_a_wrapper_still_running_pre_commit_fails(tmp_path) -> None:
+    """pre-commit cannot fetch its hooks inside an agent's sandbox; prek can."""
+    _wrapper(tmp_path, _PRE_COMMIT_WRAPPER)
+    fails, _ = audit.check_precommit_wrapper(audit.Repo(tmp_path))
+    assert len(fails) == 1
+    assert "prek run" in fails[0] and "scaffold.md" in fails[0]
+
+
+def test_prek_named_only_in_a_comment_or_message_fails(tmp_path) -> None:
+    """A mention is not an invocation: the hook still runs pre-commit."""
+    _wrapper(
+        tmp_path,
+        "#!/bin/sh\n# move this to prek run\n"
+        'echo "install prek: uv tool install prek"\nexec pre-commit run\n',
+    )
+    fails, _ = audit.check_precommit_wrapper(audit.Repo(tmp_path))
+    assert len(fails) == 1 and "prek run" in fails[0]
+
+
+def test_the_prek_wrapper_passes(tmp_path) -> None:
+    """A wrapper that runs prek, and says how to install it when it is missing."""
+    _wrapper(tmp_path, _PREK_WRAPPER)
+    assert audit.check_precommit_wrapper(audit.Repo(tmp_path)) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "if command -v prek >/dev/null; then prek run; fi\n",
+        "if ! prek run; then exit 1; fi\n",
+        "uvx prek run\n",
+    ],
+)
+def test_any_command_that_runs_prek_passes(tmp_path, command: str) -> None:
+    """`prek run` as two shell words counts wherever it sits in the line."""
+    _wrapper(tmp_path, "#!/bin/sh\n" + command)
+    assert audit.check_precommit_wrapper(audit.Repo(tmp_path)) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'echo "pre-commit cannot fetch the hooks (prek run can)" >&2; '
+        "exec pre-commit run\n",
+        'echo "hint: use uv; prek run" ; exec pre-commit run\n',
+        "echo 'or: prek run' ; exec pre-commit run\n",
+    ],
+)
+def test_prek_run_inside_quotes_fails(tmp_path, command: str) -> None:
+    """Quoted text runs nothing, whatever punctuation sits before it."""
+    _wrapper(tmp_path, "#!/bin/sh\n" + command)
+    fails, _ = audit.check_precommit_wrapper(audit.Repo(tmp_path))
+    assert len(fails) == 1 and "prek run" in fails[0]
+
+
 def test_list_mode_names_every_check(capsys) -> None:
     """The skill points readers at --list instead of enumerating rules that go stale."""
     assert audit.main(["--list"]) == 0
