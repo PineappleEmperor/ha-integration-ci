@@ -84,6 +84,27 @@ def test_install_takes_homeassistant_from_test_requirements(
     assert any("-r requirements.test.txt" in call for call in calls)
     installed = " ".join(calls).split()
     assert not any(arg.startswith("homeassistant") for arg in installed)
+    assert not any(
+        arg.startswith(("pytest-cov", "pytest-timeout")) for arg in installed
+    )
+
+
+def test_install_adds_the_pytest_plugins_core_s_harness_lacks(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Core's harness brings neither pytest-cov nor pytest-timeout; the Pytest step uses both.
+
+    They resolve in the same call as the requirements, so a clash fails the install
+    rather than one silently replacing the other.
+    """
+    (tmp_path / "requirements.test.txt").write_text(
+        "pytest-homeassistant[bluetooth]==2026.11.0\n"
+    )
+    result, calls = _run_step("Install", tmp_path, ["uv"])
+    assert result.returncode == 0, result.stderr
+    (harness_call,) = [call for call in calls if "-r requirements.test.txt" in call]
+    assert "pytest-cov==" in harness_call
+    assert "pytest-timeout==" in harness_call
 
 
 def _repo(root: pathlib.Path, *files: str) -> pathlib.Path:
