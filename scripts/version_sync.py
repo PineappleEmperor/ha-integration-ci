@@ -116,8 +116,8 @@ def _harness_problems(reqs: str) -> list[str]:
         return [
             "requirements.test.txt pins no test harness: pin "
             "pytest-homeassistant==<Home Assistant release>, or "
-            "pytest-homeassistant-custom-component==<version> for HA 2026.10 or "
-            "older (the suite would test against whichever HA release is current)"
+            "pytest-homeassistant-custom-component==<version> (the suite would test "
+            "against whichever HA release is current)"
         ]
     return []
 
