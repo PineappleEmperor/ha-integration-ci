@@ -10,6 +10,17 @@ import sys
 PHCC = re.compile(
     r"^\s*pytest-homeassistant-custom-component\s*==\s*(?P<version>\S+)", re.MULTILINE
 )
+PHCC_NAMED = re.compile(
+    r"^\s*pytest[-_.]homeassistant[-_.]custom[-_.]component\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+# Core's own harness, released once per Home Assistant release. PyPI also carries an
+# unrelated `pytest-homeassistant` 0.1.x from 2020, so only one exact HA release counts.
+CORE_HARNESS = re.compile(
+    r"^[ \t]*pytest[-_.]homeassistant(?![-_.\w])(?:\[[^\]\n]*\])?(?P<spec>[^#\n]*)",
+    re.MULTILINE | re.IGNORECASE,
+)
+HA_RELEASE = re.compile(r"\s*==\s*\d{4}\.\d{1,2}\.\d+(?:(?:a|b|rc)\d+)?\s*")
 RUFF_TARGET = re.compile(r'target-version\s*=\s*"py(?P<major>\d)(?P<minor>\d+)"')
 PY_VERSION = re.compile(r'python-version:\s*["\']?(?P<version>\d+\.\d+)')
 # The reusable workflows a consumer calls from this repository.
@@ -71,15 +82,44 @@ def problems(root: pathlib.Path) -> list[str]:
         detail = ", ".join(f"{k}={v}" for k, v in sorted(declared.items()))
         out.append(f"python version disagrees across {len(declared)} files: {detail}")
 
-    # The pin is what fixes the HA release under test; without it the suite silently
-    # follows whatever HA published today.
     reqs = _read(root / "requirements.test.txt")
-    if reqs and not PHCC.search(reqs):
-        out.append(
-            "requirements.test.txt does not pin pytest-homeassistant-custom-component "
-            "(the suite would test against whichever HA release is current)"
-        )
+    if reqs:
+        out += _harness_problems(reqs)
     return out
+
+
+def _harness_problems(reqs: str) -> list[str]:
+    """What is wrong with the test harness requirements.test.txt pins.
+
+    The pin is what fixes the HA release under test; without it the suite silently
+    follows whatever HA published today. Either harness may fix it, never both, since
+    they supply the same fixtures.
+    """
+    core = [(m.group(0).strip(), m.group("spec")) for m in CORE_HARNESS.finditer(reqs)]
+    if core and PHCC_NAMED.search(reqs):
+        return [
+            "requirements.test.txt names both pytest-homeassistant and "
+            "pytest-homeassistant-custom-component; they supply the same fixtures, "
+            "so keep one"
+        ]
+    if core:
+        bad = [line for line, spec in core if not HA_RELEASE.fullmatch(spec)]
+        if bad:
+            return [
+                "requirements.test.txt must pin core's harness as "
+                "pytest-homeassistant==<Home Assistant release>, not "
+                f"{', '.join(bad)} (anything else can resolve to an unrelated 0.1.x "
+                "package, or follow whichever HA release is current)"
+            ]
+        return []
+    if not PHCC.search(reqs):
+        return [
+            "requirements.test.txt pins no test harness: pin "
+            "pytest-homeassistant==<Home Assistant release>, or "
+            "pytest-homeassistant-custom-component==<version> for HA 2026.10 or "
+            "older (the suite would test against whichever HA release is current)"
+        ]
+    return []
 
 
 def thin(root: pathlib.Path) -> list[str]:
