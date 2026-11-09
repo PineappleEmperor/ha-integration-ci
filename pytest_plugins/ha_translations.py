@@ -1,8 +1,9 @@
 """Core's translation check, for a custom integration's test suite.
 
 A port of the autouse `check_translations` fixture in Home Assistant core's
-`tests/components/conftest.py` at 2026.10.2, which pytest-homeassistant-custom-component
-does not ship. README.md says what it checks and how python-validate.yml loads it.
+`tests/components/conftest.py` at 2026.11.1, which neither core's pytest-homeassistant
+nor pytest-homeassistant-custom-component ships. README.md says what it checks and how
+python-validate.yml loads it.
 """
 
 import asyncio

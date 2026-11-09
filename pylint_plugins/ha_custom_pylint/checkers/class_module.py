@@ -4,7 +4,7 @@ from astroid import nodes
 from pylint.checkers import BaseChecker
 from pylint.lint import PyLinter
 
-from ha_custom_pylint.const import ENTITY_COMPONENTS, Module, Platform
+from ha_custom_pylint.const import Module, Platform
 from ha_custom_pylint.helpers.module_info import parse_module
 
 _BASE_ENTITY_MODULES: set[str] = {
@@ -32,7 +32,7 @@ _MODULES: dict[str, set[str]] = {
     Platform.BUTTON: {"ButtonEntity", "ButtonEntityDescription"},
     Platform.CALENDAR: {"CalendarEntity", "CalendarEntityDescription"},
     Platform.CAMERA: {"Camera", "CameraEntityDescription"},
-    Platform.CLIMATE: {"ClimateEntity", "ClimateEntityDescription"},
+    Platform.CLIMATE: {"ClimateEntity", "ClimateEntityDescription", "RestoreClimate"},
     Module.COORDINATOR: {"DataUpdateCoordinator"},
     Platform.CONVERSATION: {"ConversationEntity"},
     Platform.COVER: {"CoverEntity", "CoverEntityDescription"},
@@ -55,12 +55,24 @@ _MODULES: dict[str, set[str]] = {
         "ImageProcessingFaceEntity",
         "ImageProcessingEntityDescription",
     },
+    Platform.INFRARED: {
+        "InfraredEmitterEntity",
+        "InfraredEmitterEntityDescription",
+        "InfraredReceiverEntity",
+        "InfraredReceiverEntityDescription",
+    },
     Platform.LAWN_MOWER: {"LawnMowerEntity", "LawnMowerEntityDescription"},
     Platform.LIGHT: {"LightEntity", "LightEntityDescription"},
     Platform.LOCK: {"LockEntity", "LockEntityDescription"},
     Platform.MEDIA_PLAYER: {"MediaPlayerEntity", "MediaPlayerEntityDescription"},
     Platform.NOTIFY: {"NotifyEntity", "NotifyEntityDescription"},
     Platform.NUMBER: {"NumberEntity", "NumberEntityDescription", "RestoreNumber"},
+    Platform.RADIO_FREQUENCY: {
+        "RadioFrequencyReceiverEntity",
+        "RadioFrequencyReceiverEntityDescription",
+        "RadioFrequencyTransmitterEntity",
+        "RadioFrequencyTransmitterEntityDescription",
+    },
     Platform.REMOTE: {"RemoteEntity", "RemoteEntityDescription"},
     Platform.SELECT: {"SelectEntity", "SelectEntityDescription"},
     Platform.SENSOR: {"RestoreSensor", "SensorEntity", "SensorEntityDescription"},
@@ -82,26 +94,6 @@ _MODULES: dict[str, set[str]] = {
         "WeatherEntityDescription",
     },
 }
-_ENTITY_COMPONENTS: set[str] = set(ENTITY_COMPONENTS).union(
-    {
-        "alert",
-        "automation",
-        "counter",
-        "input_boolean",
-        "input_button",
-        "input_datetime",
-        "input_number",
-        "input_select",
-        "input_text",
-        "person",
-        "plant",
-        "remember_the_milk",
-        "schedule",
-        "script",
-        "tag",
-        "timer",
-    }
-)
 
 
 _MODULE_CLASSES = {
@@ -134,10 +126,7 @@ class HassEnforceClassModule(BaseChecker):
 
         ancestors = list(node.ancestors())
 
-        if (
-            current_module != Module.ENTITY
-            and current_integration not in _ENTITY_COMPONENTS
-        ):
+        if current_module != Module.ENTITY:
             top_level_ancestors = list(node.ancestors(recurs=False))
 
             for ancestor in top_level_ancestors:

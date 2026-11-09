@@ -27,7 +27,7 @@ jobs:
 
       - name: Install
         run: |
-          uv pip install --system ruff==0.17.3 mypy==2.4.0 pylint==4.0.8 astroid==4.0.4
+          uv pip install --system ruff==0.17.3 mypy==2.4.0 pylint==4.1.3 astroid==4.3.4
           if [ -f requirements.test.txt ]; then
             plugins=()
             if grep -Eiq '^[[:space:]]*pytest[-_.]homeassistant([^-_.[:alnum:]]|$)' requirements.test.txt; then
@@ -35,7 +35,7 @@ jobs:
             fi
             uv pip install --system -r requirements.test.txt "${plugins[@]}"
           else
-            uv pip install --system homeassistant==2026.10.2
+            uv pip install --system homeassistant==2026.11.1
           fi
 
       - name: Ruff

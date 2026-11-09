@@ -23,7 +23,7 @@ step runs against the consumer's own checkout.
 - **python-validate.yml**'s `python-version` is a scalar rather than a matrix: a matrix
   would rename the check-run to `lint-and-type (3.14)` and the ruleset's required context
   would never report. It installs with `uv`, which resolves the HA test stack —
-  `homeassistant` plus `pytest-homeassistant-custom-component` pull several hundred
+  `homeassistant` plus its test harness pull several hundred
   packages — in seconds where pip takes minutes; the cache key covers
   `requirements.test.txt` and `pyproject.toml`, the files that actually decide the
   dependency set, so a key over the whole repo would re-resolve on any unrelated change
@@ -31,11 +31,11 @@ step runs against the consumer's own checkout.
   whole repository — Home Assistant core's own rule set, not `custom_components/` alone —
   so nothing beside the integration rots unseen, and the format check keeps the tree
   exactly as `ruff format` leaves it, so no file ever needs a formatter exclusion.
-  Ruff, mypy and prek are pinned to 0.17.3, 2.4.0 and 0.5.7, the versions Home Assistant
-  core 2026.11.0 pins, and pylint to 4.0.8 with its astroid at 4.0.4, the versions core
-  2026.10.2 pins, the tag the pylint rules are synced to, because the consumer's rule
-  set, `mypy.ini`, pylint rules and hooks are derived from core's and a newer tool
-  reports errors core has not met yet. A repository without
+  Ruff, mypy, pylint and prek are pinned to 0.17.3, 2.4.0, 4.1.3 and 0.5.7, with
+  pylint's astroid at 4.3.4, the versions Home Assistant core 2026.11.1 pins, the tag
+  the pylint rules are synced to, because the consumer's rule set, `mypy.ini`, pylint
+  rules and hooks are derived from core's and a newer tool reports errors core has not
+  met yet. A repository without
   `requirements.test.txt` gets `homeassistant` pinned too, to the `core_tag` in
   `UPSTREAM.json`, so pylint's
   inference runs against the release the pylint rules come from rather than the newest
@@ -52,15 +52,15 @@ step runs against the consumer's own checkout.
   the job timeout; the flag comes from `pytest-timeout`, which
   pytest-homeassistant-custom-component brings. Core's `pytest-homeassistant` brings
   neither `pytest-timeout` nor `pytest-cov`, so with it pinned the install step adds
-  both at the versions core 2026.11.0's `requirements_test.txt` pins, in the same
+  both at the versions core 2026.11.1's `requirements_test.txt` pins, in the same
   resolve as `requirements.test.txt`, so a clash with a pin of the consumer's own fails
   the install rather than one silently replacing the other. The job name says what the job is for rather than which tools it runs, because
   it is half of every consumer's required context: swapping a tool must not rename the
   check.
 - **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
-  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.10.2.
-  pytest-homeassistant-custom-component copies core's root `tests/conftest.py` but not that
-  file, so without the port a flow error, abort, repair issue, action or action exception
+  `check_translations` fixture in core's `tests/components/conftest.py` at 2026.11.1.
+  Neither core's `pytest-homeassistant` nor pytest-homeassistant-custom-component ships
+  that fixture, so without the port a flow error, abort, repair issue, action or action exception
   whose text is missing from `translations/en.json` passes here and fails in core; a user
   then sees the raw key. An abort another domain translates, `homeassistant` in most
   cases, also fails here as it does in core when the integration copies that domain's text
@@ -89,9 +89,14 @@ step runs against the consumer's own checkout.
   exist, which it reads as nothing having run. Other
   modules carry no threshold here. pytest-cov arrives with the community test harness,
   and the install step adds it beside core's.
-- **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
-  in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.10.2, the release
-  consumers test against, under Apache-2.0 with its `NOTICE`. Core's
+- **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of core's
+  pylint plugin, taken at 2026.9.0 from `pylint/plugins` and synced to 2026.11.1, the
+  release consumers test against, under Apache-2.0 with its `NOTICE`. From 2026.11.0
+  core ships the plugin as its own package, `packages/pylint-home-assistant`, which is
+  where `scripts/pylint_upstream.py` reads it; a tag from before the move cannot be
+  compared. The rules follow the Home Assistant release they come from, so a consumer
+  whose suite runs an older release can be told to write code that release rejects:
+  v5.0.0's edits, under The version model, are the case. Core's
   plugin decides what an integration is by the module name `homeassistant.components.<domain>`,
   which a custom integration never has, so run as published it stays silent on most of
   one, and its README says it is not for external use. The copy keeps core's checkers,
@@ -312,9 +317,10 @@ the consumer's own `.github/workflows/`, the three reusable workflows in the
 `.ha-integration-ci/` checkout beside it, ruff's `target-version` and the
 `python_version` in `mypy.ini`'s `[mypy]` section, and requires `requirements.test.txt`,
 when it exists, to pin exactly one test harness: core's `pytest-homeassistant`, released
-once per Home Assistant release, pinned with `==` to one release such as `2026.11.0`, or
-`pytest-homeassistant-custom-component` with `==`, which a repository testing Home
-Assistant 2026.10 or older stays on. A range, a wildcard or no pin on core's harness
+once per Home Assistant release, pinned with `==` to one release such as `2026.11.1`, or
+`pytest-homeassistant-custom-component` with `==`. Either passes this check whatever
+Home Assistant it brings; the pylint rules, synced to 2026.11.1, are what need 2026.11
+or newer, as v5.0.0's edits say. A range, a wildcard or no pin on core's harness
 fails, because PyPI also carries an unrelated `pytest-homeassistant` 0.1.x from 2020 by
 another author, and so does a pin of that 0.1.x. Naming both harnesses fails, since
 they supply the same fixtures. A consumer's own
@@ -384,6 +390,27 @@ There is no `templates/` directory to walk and no `_template_dir` helper.
 - **v4.0.0's edits.** `.githooks/pre-commit` calls `prek run` in place of
   `pre-commit run`; the wrapper is under *Step 6: Copy the config and CI files* in the
   ha-integration skill's `reference/scaffold.md`.
+- **v5.0.0's edits.** The pylint rules come from core 2026.11.1, so the suite runs Home
+  Assistant 2026.11 or newer: `requirements.test.txt` pins core's
+  `pytest-homeassistant==2026.11.1` in place of pytest-homeassistant-custom-component,
+  the tests import from `pytest_homeassistant` in place of
+  `pytest_homeassistant_custom_component`, the conftest fixture that only requests
+  `enable_custom_integrations` can go, and the pytest `addopts` in `pyproject.toml`
+  carries `-p no:respx`. `async_setup_entry`, `async_unload_entry` and
+  `async_migrate_entry` return `None` and report a failure by raising (E7403), the
+  unload through `await hass.config_entries.async_unload_platforms_or_raise(entry,
+  PLATFORMS)`; Home Assistant 2026.10 fails a setup that returns `None`, which is why
+  2026.10 cannot stay. Actions are registered in `services.py`, from a `@callback`
+  `async_setup_services(hass)` that `async_setup` calls (W7452, W7453). The integration
+  and its tests pass the other rules core added at 2026.11: C7416 (`# noqa: F401` in a
+  module with `__all__`), C7417 (`__init__` first), R7405 (no `data=` on a user flow),
+  W7438 (no `CONNECTION_CLASS`), W7439 (advance the time, never refresh a coordinator by
+  hand), W7440 and W7441 (a config flow test checks the unique ID and recovers from each
+  error), W7442 (no `translation_key` that repeats the device class name), W7443
+  (`step_id` matches its method), W7445 (the `MockConfigEntry` flow helpers), W7447 and
+  W7448 (a coordinator takes the typed config entry and stores it once), W7449 (a
+  coordinator entity's `available` uses `super().available`) and W7450 (no log before a
+  raise Home Assistant reports).
 - **A release is held for three days before it is offered.** Dependabot resolves the pinned
   SHA to its tag, sees the newer release, and then filters it: `Days since release : 0
   (cooldown days 3)`, `All versions are in cooldown period, returning current version`. That
@@ -418,7 +445,7 @@ under The five workflows in that README and given complete under Calling the wor
 ```
 ruff check .
 ruff format --check .
-python -m pytest tests/ -q -p no:homeassistant
+python -m pytest tests/ -q -p no:pytest_homeassistant -p no:respx
 ```
 
 `ci.yml` runs the same three commands above, plus `python scripts/version_sync.py --root
@@ -427,17 +454,19 @@ with per-file ignores of its own, since the scripts execute inside every consume
 quality-audit job. It installs `pyyaml`
 because `skill_audit.py` parses workflows and the tests import it — a local venv that
 already has it installed would hide a missing dependency, so the job names every import
-the suite reaches. It installs pytest-homeassistant-custom-component at the version the
-skill's template pins, because `tests/test_ha_translations.py` runs a sample integration's
-suite under the plugin in a child pytest; `-p no:homeassistant` keeps that harness out of
-this suite's own run, whose sync tests its autouse async fixtures would break, and the
-test module skips when no harness is present. The two harnesses cannot share an
-environment, so a second job, `Translation check on core's harness`, installs core's
-`pytest-homeassistant` alone and runs that module again under
-`-p no:pytest_homeassistant`, proving the plugin on the harness a consumer on Home
-Assistant 2026.11 or newer runs. It installs pylint and astroid at
-python-validate's pins, because `tests/test_ha_custom_pylint.py` lints sample
-repositories with the pylint rules in a child pylint and skips without them.
+the suite reaches. It installs core's `pytest-homeassistant` at the version the skill's
+template pins, 2026.11.1, the release the pylint rules are synced to, because
+`tests/test_ha_translations.py` runs a sample integration's suite under the plugin in a
+child pytest, and `tests/test_ha_custom_pylint.py` needs the Home Assistant it brings
+for pylint to infer against; `-p no:pytest_homeassistant` keeps that harness out of this
+suite's own run, whose sync tests its autouse async fixtures would break, and
+`-p no:respx` keeps respx's pytest plugin from importing `httpx` before Home Assistant
+2026.11 aliases it, which fails the run at collection. The translation module runs on
+pytest-homeassistant-custom-component too, and skips when no harness is present, but
+nothing here installs that harness any more: the pylint rules need 2026.11, which it
+does not bring yet. It installs pylint and astroid at python-validate's pins, because
+`tests/test_ha_custom_pylint.py` lints sample repositories with the pylint rules in a
+child pylint and skips without them.
 
 Every check in `scripts/skill_audit.py` is a function returning `(failures, warnings)`
 and has a test in `tests/test_skill_audit.py`. A changed check gets its test changed
