@@ -2,9 +2,10 @@
 
 Each test builds a one-integration repository in a temporary directory and runs its
 suite in a child pytest with the plugin loaded, the way python-validate.yml runs a
-consumer's. The child needs a test harness, pytest-homeassistant-custom-component or
-core's pytest-homeassistant, whichever is installed; this suite's own run must not load
-it, which is why ci.yml passes `-p no:homeassistant` or `-p no:pytest_homeassistant`.
+consumer's. The child needs a test harness, core's pytest-homeassistant or
+pytest-homeassistant-custom-component, whichever is installed; this suite's own run must
+not load it, which is why ci.yml passes `-p no:pytest_homeassistant` (and a local run on
+the community harness `-p no:homeassistant`).
 """
 
 import importlib.util
