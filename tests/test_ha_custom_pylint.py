@@ -99,15 +99,43 @@ _SAMPLE = {
 
         from homeassistant.config_entries import ConfigEntry
         from homeassistant.const import Platform
-        from homeassistant.core import HomeAssistant, ServiceCall
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.core import HomeAssistant
         from homeassistant.helpers.typing import ConfigType
 
-        from .const import DOMAIN
+        from .services import async_setup_services
 
         PLATFORMS: list[Platform] = [Platform.SENSOR]
 
         type SampleConfigEntry = ConfigEntry[int]
+
+
+        async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+            """Register the actions."""
+            async_setup_services(hass)
+            return True
+
+
+        async def async_setup_entry(hass: HomeAssistant, entry: SampleConfigEntry) -> None:
+            """Set up one entry."""
+            entry.runtime_data = 1
+            await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+
+        async def async_unload_entry(hass: HomeAssistant, entry: SampleConfigEntry) -> None:
+            """Unload one entry."""
+            await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
+
+
+        async def async_migrate_entry(hass: HomeAssistant, entry: SampleConfigEntry) -> None:
+            """Nothing to migrate yet."""
+        ''',
+    "custom_components/sample/services.py": '''
+        """Actions for the sample integration."""
+
+        from homeassistant.core import HomeAssistant, ServiceCall, callback
+        from homeassistant.exceptions import HomeAssistantError
+
+        from .const import DOMAIN
 
 
         async def _async_ping(call: ServiceCall) -> None:
@@ -119,27 +147,10 @@ _SAMPLE = {
             )
 
 
-        async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+        @callback
+        def async_setup_services(hass: HomeAssistant) -> None:
             """Register the actions."""
             hass.services.async_register(DOMAIN, "ping", _async_ping)
-            return True
-
-
-        async def async_setup_entry(hass: HomeAssistant, entry: SampleConfigEntry) -> bool:
-            """Set up one entry."""
-            entry.runtime_data = 1
-            await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-            return True
-
-
-        async def async_unload_entry(hass: HomeAssistant, entry: SampleConfigEntry) -> bool:
-            """Unload one entry."""
-            return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-
-        async def async_migrate_entry(hass: HomeAssistant, entry: SampleConfigEntry) -> bool:
-            """Nothing to migrate yet."""
-            return True
         ''',
     "custom_components/sample/sensor.py": '''
         """Sensor platform for the sample integration."""
@@ -289,7 +300,7 @@ _CLEAN_TESTS = {
         """Fixtures for the sample tests."""
 
         import pytest
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+        from pytest_homeassistant.common import MockConfigEntry
 
         from custom_components.sample.const import DOMAIN
 
@@ -302,7 +313,7 @@ _CLEAN_TESTS = {
     "tests/test_init.py": '''
         """Tests for the sample integration's setup."""
 
-        from pytest_homeassistant_custom_component.common import (
+        from pytest_homeassistant.common import (
             MockConfigEntry,
             load_json_object_fixture,
         )
@@ -350,9 +361,10 @@ _DIRTY_TESTS = {
         """Tests that break every test rule."""
 
         import json
+        import logging
 
         import pytest
-        from pytest_homeassistant_custom_component.common import (
+        from pytest_homeassistant.common import (
             MockConfigEntry,
             load_fixture,
         )
@@ -360,6 +372,7 @@ _DIRTY_TESTS = {
         from homeassistant.const import Platform
         from homeassistant.core import HomeAssistant
         from homeassistant.helpers import entity_registry as er
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
         from custom_components.sample import (
             async_migrate_entry,
@@ -395,6 +408,56 @@ _DIRTY_TESTS = {
         async def test_redundant_root(hass: HomeAssistant) -> None:
             """The root conftest.py already applies it."""
             assert hass
+
+
+        async def test_refresh_by_hand(hass: HomeAssistant) -> None:
+            """Refreshes the coordinator rather than advancing the time: W7439."""
+            coordinator = DataUpdateCoordinator(
+                hass, logging.getLogger(__name__), name="x", config_entry=None
+            )
+            await coordinator.async_refresh()
+        ''',
+    "tests/test_config_flow.py": '''
+        """Config flow tests that break the flow test rules."""
+
+        from pytest_homeassistant.common import MockConfigEntry
+
+        from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
+        from homeassistant.core import HomeAssistant
+        from homeassistant.data_entry_flow import FlowResultType
+
+        from custom_components.sample.const import DOMAIN
+
+
+        async def test_user_creates_entry(hass: HomeAssistant) -> None:
+            """Passes data to a user flow (R7405), never checks the unique ID (W7440)."""
+            result = await hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": SOURCE_USER}, data={"host": "h"}
+            )
+            assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+        async def test_user_cannot_connect(hass: HomeAssistant) -> None:
+            """Shows the error and stops there: W7441."""
+            result = await hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": SOURCE_USER}
+            )
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {"host": "bad"}
+            )
+            assert result["errors"] == {"base": "cannot_connect"}
+
+
+        async def test_reauth_by_hand(
+            hass: HomeAssistant, mock_config_entry: MockConfigEntry
+        ) -> None:
+            """Builds the reauth context by hand: W7445."""
+            mock_config_entry.add_to_hass(hass)
+            result = await hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+            )
+            assert result["type"] is FlowResultType.FORM
         ''',
 }
 
@@ -423,6 +486,7 @@ _DIRTY = {
     "custom_components/dirty/translations/en.json": """
         {"config": {"step": {"user": {"data": {"host": "Host"}}}},
          "options": {"step": {"init": {"data": {}}}},
+         "entity": {"sensor": {"temperature": {"name": "Temperature"}}},
          "exceptions": {"known": {"message": "Failed on {device}"}}}
         """,
     "custom_components/dirty/const.py": '''
@@ -444,9 +508,9 @@ _DIRTY = {
         from homeassistant.components.sensor import DOMAIN
         from homeassistant.components.sensor.const import SensorDeviceClass
         from homeassistant.config_entries import ConfigEntry
-        from homeassistant.const import Platform
+        from homeassistant.const import CONF_PORT, Platform  # noqa: F401
         from homeassistant.core import HomeAssistant, ServiceCall, callback
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
         from homeassistant.helpers.device_registry import (
             CONNECTION_NETWORK_MAC,
             DeviceInfo,
@@ -501,6 +565,9 @@ _DIRTY = {
                 raise HomeAssistantError(
                     "msg", translation_domain="dirty", translation_key="known"
                 )
+            if entry.pref_disable_polling:
+                _LOGGER.error("Not ready yet")
+                raise ConfigEntryNotReady
             return True
 
 
@@ -532,6 +599,14 @@ _DIRTY = {
 
         class DirtyFlow(ConfigFlow, domain=DOMAIN):
             """Flow."""
+
+            CONNECTION_CLASS = "local_poll"
+
+            async def async_step_confirm(
+                self, user_input: dict[str, Any] | None = None
+            ) -> ConfigFlowResult:
+                """Shows another step's form."""
+                return self.async_show_form(step_id="user")
 
             async def async_step_user(
                 self, user_input: dict[str, Any] | None = None
@@ -594,14 +669,23 @@ _DIRTY = {
         """Sensor platform."""
 
         from homeassistant.components.binary_sensor import BinarySensorEntity
-        from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+        from homeassistant.components.sensor import (
+            SensorDeviceClass,
+            SensorEntity,
+            SensorEntityDescription,
+        )
         from homeassistant.config_entries import ConfigEntry
         from homeassistant.helpers.restore_state import RestoreEntity
-        from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
         from .const import DOMAIN
+        from .entity import DirtyEntity
 
         DESC = SensorEntityDescription(key="temp", entity_registry_enabled_default=True)
+        TEMPERATURE = SensorEntityDescription(
+            key="t",
+            translation_key="temperature",
+            device_class=SensorDeviceClass.TEMPERATURE,
+        )
         ICON = "mdi:definitely-not-an-icon"
         MICRO = "µs"
 
@@ -639,7 +723,7 @@ _DIRTY = {
             """Binary sensor in sensor.py."""
 
 
-        class CoordSensor(CoordinatorEntity, SensorEntity):
+        class CoordSensor(DirtyEntity, SensorEntity):
             """Forgets super on a coordinator entity."""
 
             _attr_has_entity_name = True
@@ -648,6 +732,72 @@ _DIRTY = {
             async def async_added_to_hass(self) -> None:
                 """Forget super."""
                 self._attr_native_value = 2
+
+            @property
+            def available(self) -> bool:
+                """Reads data from the base class in entity.py, not success: W7449."""
+                return self.reading_ok
+
+
+        class LateInit(SensorEntity):
+            """Defines a method before its constructor: C7417."""
+
+            _attr_has_entity_name = True
+
+            def describe(self) -> str:
+                """Before the constructor."""
+                return "late"
+
+            def __init__(self, serial: str) -> None:
+                """Init."""
+                self._attr_unique_id = serial
+        ''',
+    "custom_components/dirty/entity.py": '''
+        """Base entity."""
+
+        from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+
+        class DirtyEntity(CoordinatorEntity):
+            """The integration's own coordinator entity."""
+
+            @property
+            def reading_ok(self) -> bool:
+                """Whether the coordinator holds a reading."""
+                return self.coordinator.data is not None
+        ''',
+    "custom_components/dirty/coordinator.py": '''
+        """Coordinator."""
+
+        import logging
+
+        from homeassistant.config_entries import ConfigEntry
+        from homeassistant.core import HomeAssistant
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+        type DirtyConfigEntry = ConfigEntry[DirtyCoordinator]
+
+
+        class DirtyCoordinator(DataUpdateCoordinator[int]):
+            """A plain ConfigEntry (W7447), stored twice (W7448)."""
+
+            config_entry: ConfigEntry
+
+            def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+                """Init."""
+                super().__init__(
+                    hass, logging.getLogger(__name__), name="dirty", config_entry=entry
+                )
+                self.config_entry = entry
+        ''',
+    "custom_components/dirty/services.py": '''
+        """Actions."""
+
+        from homeassistant.core import HomeAssistant
+
+
+        async def async_setup_services(hass: HomeAssistant) -> None:
+            """A coroutine, not a callback: W7453."""
         ''',
     "custom_components/dirty/switch.py": '''
         """Switch platform."""
@@ -723,6 +873,11 @@ _TESTS_SIDE = {
     "W7422",
     "W7426",
     "W7435",
+    "R7405",
+    "W7439",
+    "W7440",
+    "W7441",
+    "W7445",
 }
 
 
@@ -773,8 +928,8 @@ def _ids(messages: list[dict]) -> set[str]:
 
 
 def test_the_carried_set_is_the_whole_plugin() -> None:
-    """All 68 messages core's plugin defines at the tag are carried."""
-    assert len(CARRIED) == 68
+    """All 84 messages core's plugin defines at the tag are carried."""
+    assert len(CARRIED) == 84
     assert _UPSTREAM["skipped"] == {}
     assert set(CARRIED) >= _TESTS_SIDE
 
@@ -805,6 +960,7 @@ def test_the_integration_is_named_bare_and_the_tests_by_package(
     }
     assert {m["module"] for m in runs["dirty tests"]} == {
         "tests.conftest",
+        "tests.test_config_flow",
         "tests.test_dirty",
     }
 
@@ -1172,7 +1328,7 @@ async def test_setup(hass, entry):
         # The alias fix must not flag an alias of something else.
         pytest.param(
             """
-from pytest_homeassistant_custom_component.common import async_fire_time_changed as fire
+from pytest_homeassistant.common import async_fire_time_changed as fire
 
 async def test_setup(hass):
     fire(hass)
@@ -1341,7 +1497,7 @@ def test_an_aliased_call_of_something_else_is_not_caught(
 ) -> None:
     """Matching on the import source must not flag an alias of a non-integration."""
     code = """
-from pytest_homeassistant_custom_component.common import async_fire_time_changed as renamed
+from pytest_homeassistant.common import async_fire_time_changed as renamed
 
 async def test_call(hass):
     renamed(hass)

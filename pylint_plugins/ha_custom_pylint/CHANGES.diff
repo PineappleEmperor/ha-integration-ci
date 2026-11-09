@@ -22,6 +22,32 @@
                      continue
                  if _decorator_swallows(inferred):
                      self.add_message(
+--- a/checkers/coordinator_entity_available.py
++++ b/checkers/coordinator_entity_available.py
+@@ -22,7 +22,7 @@
+ from pylint.lint import PyLinter
+ 
+ from pylint_home_assistant.helpers.ast_utils import extended_ancestors
+-from pylint_home_assistant.helpers.module_info import is_integration_module
++from pylint_home_assistant.helpers.module_info import is_integration_module, parse_module
+ 
+ _COORDINATOR_QNAME = "homeassistant.helpers.update_coordinator.DataUpdateCoordinator"
+ _COORDINATOR_ENTITY_QNAME = "homeassistant.helpers.update_coordinator.CoordinatorEntity"
+@@ -70,7 +70,13 @@
+     """Return the property or method *name* that the integration defines."""
+     if class_node is None:
+         return None
+-    integration = ".".join(class_node.root().name.split(".")[:3]) + "."
++    # pylint_home_assistant: the integration's own prefix, which is not always the
++    # first three segments: custom_components.<domain>. or a bare <domain>.
++    root_name = class_node.root().name
++    if (parsed := parse_module(root_name)) is None:
++        return None
++    above = parsed.root.count(".") + 1 if root_name.startswith(f"{parsed.root}.") else 0
++    integration = ".".join(root_name.split(".")[: above + 1]) + "."
+     for klass in (class_node, *extended_ancestors(class_node)):
+         if not klass.qname().startswith(integration):
+             continue
 --- a/checkers/entity_unique_id_format.py
 +++ b/checkers/entity_unique_id_format.py
 @@ -64,10 +64,7 @@
@@ -36,9 +62,32 @@
  
  _ATTR_NAME = "_attr_unique_id"
  _PROPERTY_NAME = "unique_id"
+--- a/checkers/flow_start_helpers.py
++++ b/checkers/flow_start_helpers.py
+@@ -12,7 +12,7 @@
+ from pylint.checkers import BaseChecker, utils
+ from pylint.lint import PyLinter
+ 
+-from pylint_home_assistant.helpers.module_info import parse_module
++from pylint_home_assistant.helpers.integration import parse_test_module
+ 
+ _SOURCES = {
+     "SOURCE_REAUTH": ("reauth", "start_reauth_flow"),
+@@ -75,8 +75,9 @@
+ 
+     def visit_module(self, node: nodes.Module) -> None:
+         """Track whether we are in an integration test module."""
+-        self._in_integration_test = parse_module(
+-            node.name, include_test=True
++        # pylint_home_assistant: a repo-root tests/ module counts as well.
++        self._in_integration_test = parse_test_module(
++            node
+         ) is not None and node.name.startswith("tests.")
+ 
+     def visit_call(self, node: nodes.Call) -> None:
 --- a/checkers/imports.py
 +++ b/checkers/imports.py
-@@ -8,6 +8,7 @@
+@@ -9,6 +9,7 @@
  from pylint.lint import PyLinter
  
  from pylint_home_assistant.const import Module
@@ -46,7 +95,7 @@
  from pylint_home_assistant.helpers.module_info import parse_module
  
  
-@@ -216,6 +217,9 @@
+@@ -247,6 +248,9 @@
  
      current_package: str
      current_component: str | None
@@ -56,7 +105,7 @@
  
      def visit_module(self, node: nodes.Module) -> None:
          """Determine current package."""
-@@ -227,10 +231,38 @@
+@@ -258,8 +262,34 @@
          parsed_module = parse_module(node.name, include_test=True)
          self.current_component = parsed_module.domain if parsed_module else None
  
@@ -79,13 +128,19 @@
 +        elif self.custom_test_component is not None:
 +            self.root_segment_count = 0
 +
+         if "__all__" in node.locals and parse_module(node.name):
+             self._check_for_noqa_f401_with_all(node)
++
 +    def _is_custom_own_import(self, modname: str) -> bool:
 +        """Return True if *modname* is this custom integration's absolute path."""
 +        own_root = self.custom_own_root
 +        return own_root is not None and (
 +            modname == own_root or modname.startswith(f"{own_root}.")
 +        )
-+
+ 
+     def _check_for_noqa_f401_with_all(self, node: nodes.Module) -> None:
+         """Check for `# noqa: F401` markers in a module defining __all__."""
+@@ -281,7 +311,9 @@
      def visit_import(self, node: nodes.Import) -> None:
          """Check for improper `import _` invocations."""
          for other_module, _alias in node.names:
@@ -96,16 +151,16 @@
                  self.add_message("home-assistant-relative-import", node=node)
                  continue
              if (
-@@ -239,7 +271,7 @@
-                 if (
-                     self.current_package.startswith("tests.components.")
+@@ -292,7 +324,7 @@
+                         ("tests.components.", "pytest_homeassistant.components.")
+                     )
                      and self.current_package.split(".")[2] == other_parsed.domain
 -                ):
 +                ) or self.custom_test_component == other_parsed.domain:
                      # Ignore check if the component being tested matches
                      # the component being imported from
                      continue
-@@ -260,14 +292,16 @@
+@@ -313,14 +345,16 @@
              # No need to check relative import
              return
  
@@ -124,7 +179,7 @@
              self.add_message("home-assistant-absolute-import", node=node)
  
      def _check_for_constant_alias(
-@@ -345,6 +379,16 @@
+@@ -398,6 +432,16 @@
              self.add_message("home-assistant-relative-import", node=node)
              return False
  
@@ -141,6 +196,153 @@
          for root in ("homeassistant", "tests"):
              if current_package.startswith(f"{root}.components."):
                  if node.modname == f"{root}.components":
+--- a/checkers/redundant_translation_key.py
++++ b/checkers/redundant_translation_key.py
+@@ -19,6 +19,8 @@
+ """
+ 
+ from functools import cache
++import importlib.util
++import json
+ from pathlib import Path
+ import re
+ 
+@@ -33,10 +35,7 @@
+ )
+ from pylint_home_assistant.helpers.icons import load_icons
+ from pylint_home_assistant.helpers.integration import get_integration_dir
+-from pylint_home_assistant.helpers.module_info import (
+-    is_integration_module,
+-    parse_module,
+-)
++from pylint_home_assistant.helpers.module_info import is_integration_module, parse_module
+ from pylint_home_assistant.helpers.translations import (
+     load_translations,
+     load_translations_for_domain,
+@@ -56,6 +55,26 @@
+ _ENTITY_NAME_REFERENCE = re.compile(
+     r"\[%key:component::(\w+)::entity::(\w+)::(\w+)::name%\]"
+ )
++
++
++@cache
++def _installed_platform_translations(platform: str) -> dict | None:
++    """Return *platform*'s ``strings.json`` from the installed Home Assistant.
++
++    pylint_home_assistant: core finds the platform beside the integration, in
++    ``homeassistant/components/<platform>/``. Beside ``custom_components/<domain>``
++    there is none, so the device class names come from the installed package,
++    located without importing it.
++    """
++    spec = importlib.util.find_spec("homeassistant")
++    for location in (spec and spec.submodule_search_locations) or ():
++        strings = Path(location) / "components" / platform / "strings.json"
++        try:
++            data = json.loads(strings.read_text())
++        except OSError, ValueError:
++            continue
++        return data if isinstance(data, dict) else None
++    return None
+ 
+ 
+ @cache
+@@ -244,7 +263,12 @@
+             .get(translation_key)
+         )
+         device_class_translation = (
+-            (load_translations_for_domain(self._module, self._platform) or {})
++            (
++                load_translations_for_domain(self._module, self._platform)
++                # pylint_home_assistant: the installed platform, for a custom integration.
++                or _installed_platform_translations(self._platform)
++                or {}
++            )
+             .get("entity_component", {})
+             .get(device_class)
+         )
+--- a/checkers/tests/config_flow_error_recovery.py
++++ b/checkers/tests/config_flow_error_recovery.py
+@@ -24,7 +24,8 @@
+ from pylint.checkers import BaseChecker
+ from pylint.lint import PyLinter
+ 
+-from pylint_home_assistant.helpers.module_info import is_test_module, parse_module
++from pylint_home_assistant.helpers.integration import parse_test_module
++from pylint_home_assistant.helpers.module_info import is_test_module
+ 
+ # How many levels of helper functions are followed to find the finished flow
+ _HELPER_DEPTH = 2
+@@ -428,14 +429,20 @@
+ 
+     def visit_module(self, node: nodes.Module) -> None:
+         """Record the test package if the current module should be checked."""
+-        parsed = parse_module(node.name, include_test=True)
++        # pylint_home_assistant: a repo-root tests/test_config_flow.py counts as well,
++        # and its helpers live in the repo-root tests package.
++        parsed = parse_test_module(node)
+         self._package = None
+         if (
+             is_test_module(node.name)
+             and parsed is not None
+             and parsed.module == "test_config_flow"
+         ):
+-            self._package = f"tests.components.{parsed.domain}"
++            self._package = (
++                "tests"
++                if parsed.root == "tests"
++                else f"tests.components.{parsed.domain}"
++            )
+ 
+     def visit_functiondef(self, node: nodes.FunctionDef) -> None:
+         """Flag tests that show an error without finishing the flow."""
+--- a/checkers/tests/config_flow_unique_id.py
++++ b/checkers/tests/config_flow_unique_id.py
+@@ -24,8 +24,11 @@
+ from pylint.checkers import BaseChecker
+ from pylint.lint import PyLinter
+ 
+-from pylint_home_assistant.helpers.integration import get_tested_integration_dir
+-from pylint_home_assistant.helpers.module_info import is_test_module, parse_module
++from pylint_home_assistant.helpers.integration import (
++    get_tested_integration_dir,
++    parse_test_module,
++)
++from pylint_home_assistant.helpers.module_info import is_test_module
+ 
+ _OTHER_FLOW_MANAGERS = frozenset({"options", "subentries"})
+ 
+@@ -262,7 +265,8 @@
+ 
+     def visit_module(self, node: nodes.Module) -> None:
+         """Record whether the current module's tests should be checked."""
+-        parsed = parse_module(node.name, include_test=True)
++        # pylint_home_assistant: a repo-root tests/test_config_flow.py counts as well.
++        parsed = parse_test_module(node)
+         self._check_module = (
+             is_test_module(node.name)
+             and parsed is not None
+--- a/checkers/tests/coordinator_async_refresh.py
++++ b/checkers/tests/coordinator_async_refresh.py
+@@ -20,7 +20,8 @@
+ from pylint.checkers import BaseChecker
+ from pylint.lint import PyLinter
+ 
+-from pylint_home_assistant.helpers.module_info import is_test_module, parse_module
++from pylint_home_assistant.helpers.integration import parse_test_module
++from pylint_home_assistant.helpers.module_info import is_test_module
+ 
+ _COORDINATOR_QNAME = "homeassistant.helpers.update_coordinator.DataUpdateCoordinator"
+ _PUBLIC_REFRESH_METHODS = frozenset({"async_refresh", "async_request_refresh"})
+@@ -82,7 +83,8 @@
+         """Record whether the current module is an integration test module."""
+         self._in_component_test = (
+             is_test_module(node.name)
+-            and parse_module(node.name, include_test=True) is not None
++            # pylint_home_assistant: a repo-root tests/ module counts as well.
++            and parse_test_module(node) is not None
+         )
+ 
+     def visit_attribute(self, node: nodes.Attribute) -> None:
 --- a/checkers/tests/direct_async_migrate_entry.py
 +++ b/checkers/tests/direct_async_migrate_entry.py
 @@ -17,7 +17,11 @@
@@ -297,11 +499,15 @@
  
 --- a/helpers/integration.py
 +++ b/helpers/integration.py
-@@ -7,17 +7,50 @@
+@@ -7,17 +7,71 @@
  from astroid import nodes
  
  from pylint_home_assistant.const import IntegrationType
-+from pylint_home_assistant.helpers.module_info import is_test_module, parse_module
++from pylint_home_assistant.helpers.module_info import (
++    IntegrationModule,
++    is_test_module,
++    parse_module,
++)
  
  # Caches keyed by integration domain.  Shared across all checkers so the
  # same manifest is read at most once per pylint run.
@@ -345,10 +551,39 @@
 +        )
 +        _custom_test_domain_cache[repo_root] = domains[0] if len(domains) == 1 else None
 +    return _custom_test_domain_cache[repo_root]
++
++
++def parse_test_module(module: nodes.Module) -> IntegrationModule | None:
++    """Return ``parse_module(module.name, include_test=True)``, or a repo-root test.
++
++    pylint_home_assistant: a repo-root ``tests.<name>`` module tests the one custom
++    integration beside it, so it parses as that domain under the root ``tests``,
++    with ``<name>`` as its module, where core's would be ``tests.components``.
++    """
++    if (parsed := parse_module(module.name, include_test=True)) is not None:
++        return parsed
++    if (domain := custom_test_domain(module)) is None:
++        return None
++    parts = module.name.split(".")
++    return IntegrationModule(
++        root="tests", domain=domain, module=parts[1] if len(parts) > 1 else None
++    )
  
  
  def get_integration_dir(module: nodes.Module) -> Path | None:
-@@ -54,6 +87,9 @@
+@@ -44,6 +98,11 @@
+ 
+     Returns ``None`` when *module* is not inside ``tests/components``.
+     """
++    # pylint_home_assistant: a repo-root tests/ tests custom_components/<domain>.
++    if (domain := custom_test_domain(module)) is not None:
++        file_path = Path(module.file)
++        depth = module.name.count(".") + (file_path.name == "__init__.py")
++        return file_path.parents[depth] / "custom_components" / domain
+     test_dir = get_integration_dir(module)
+     if test_dir is None or test_dir.parent.parent.name != "tests":
+         return None
+@@ -65,6 +124,9 @@
          if part in ("components", "custom_components") and i + 1 < len(parts):
              domain = parts[i + 1]
              break
@@ -374,7 +609,7 @@
  
  _INTEGRATION_ROOT = "homeassistant.components"
  _INTEGRATION_ROOT_DOT = f"{_INTEGRATION_ROOT}."
-@@ -11,6 +17,47 @@
+@@ -13,6 +19,47 @@
  _MODULE_REGEX: re.Pattern[str] = re.compile(
      rf"^{re.escape(_INTEGRATION_ROOT)}\.\w+(\.\w+)?$"
  )
@@ -422,7 +657,7 @@
  
  
  @dataclass(frozen=True, slots=True)
-@@ -37,34 +84,46 @@
+@@ -39,36 +86,48 @@
      For deep sub-modules (e.g. ``homeassistant.components.hue.light.v2``),
      ``module`` is set to the first segment after the domain (``light``).
      """
@@ -431,6 +666,8 @@
          root = _INTEGRATION_ROOT
      elif include_test and module_name.startswith(_INTEGRATION_TEST_ROOT_DOT):
          root = _INTEGRATION_TEST_ROOT
+     elif include_test and module_name.startswith(_INTEGRATION_TEST_HELPER_ROOT_DOT):
+         root = _INTEGRATION_TEST_HELPER_ROOT
 +    # pylint_home_assistant: the two names a custom integration's modules carry.
 +    elif module_name.startswith(_CUSTOM_ROOT_DOT):
 +        root = _CUSTOM_ROOT
@@ -476,7 +713,7 @@
  
  
  def get_module_platform(module_name: str) -> str | None:
-@@ -74,7 +133,14 @@
+@@ -78,7 +137,14 @@
      the platform name for a sub-module, or ``None`` if not matched.
      """
      if not (module_match := _MODULE_REGEX.match(module_name)):
@@ -492,7 +729,7 @@
      platform = module_match.group(1)
      return platform.lstrip(".") if platform else "__init__"
  
-@@ -82,3 +148,33 @@
+@@ -86,3 +152,33 @@
  def is_test_module(module_name: str) -> bool:
      """Return True if *module_name* is a test module."""
      return module_name.startswith("tests.")

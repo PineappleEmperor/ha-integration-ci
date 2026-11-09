@@ -3,7 +3,8 @@ Copyright the Home Assistant authors.
 
 This package is derived from home-assistant/core pylint/plugins at 2026.9.0
 (https://github.com/home-assistant/core/tree/2026.9.0/pylint/plugins/pylint_home_assistant),
-and synced since to the core tag UPSTREAM.json records. It is licensed under
+and synced since to the core tag UPSTREAM.json records; from 2026.11.0 core
+ships the same package as packages/pylint-home-assistant. It is licensed under
 the Apache License, Version 2.0. A copy of the licence is in LICENSE.md beside
 this file. What UPSTREAM.json records is the pylint rules bullet under
 Implementation notes in the repository README.
@@ -33,7 +34,11 @@ package is taken to test the one integration in custom_components/.
                                          called name was imported from.
   helpers/integration.py                 read_manifest finds the domain of a bare
                                          name; custom_test_domain names the
-                                         integration a repo-root tests/ tests.
+                                         integration a repo-root tests/ tests;
+                                         parse_test_module parses a repo-root
+                                         tests.<name> as that domain under the
+                                         root tests; get_tested_integration_dir
+                                         answers custom_components/<domain> for it.
   checkers/imports.py                    C7403 fires on the custom_components.<domain>
                                          spelling of the integration's own path; a
                                          repo-root test module importing its own
@@ -56,10 +61,32 @@ package is taken to test the one integration in custom_components/.
                                          a called name is matched on the import that
                                          binds it, so an aliased import no longer
                                          evades W7418, W7420, W7421, W7422 or W7426.
+  checkers/tests/coordinator_async_refresh.py
+  checkers/tests/config_flow_unique_id.py
+  checkers/flow_start_helpers.py
+                                         W7439, W7440 and W7445 read a repo-root test
+                                         module through parse_test_module, where core
+                                         reads tests.components.<domain> alone.
+  checkers/tests/config_flow_error_recovery.py
+                                         W7441 does too, and follows the helpers of
+                                         the repo-root tests package, where core
+                                         follows those of tests.components.<domain>.
+  checkers/coordinator_entity_available.py
+                                         W7449 follows the members the integration
+                                         defines under its own prefix, from
+                                         parse_module, where core takes the first
+                                         three segments of the module name.
 
 Change 2: R7403 reads a custom repository's conftest files. Core's walk in
 checkers/tests/redundant_usefixtures.py stops below the tests root. Ours also
 reads tests/conftest.py and the repository-root conftest.py, where a custom
 repository keeps its fixtures, and stops there.
+
+Change 3: W7442 reads the platform's device class names from the installed
+Home Assistant. Core's checkers/redundant_translation_key.py reads them from
+homeassistant/components/<platform>/strings.json beside the integration.
+Beside custom_components/<domain> there is no such directory, so ours falls
+back to that file in the installed homeassistant package, found without
+importing it.
 
 Everything else is core's code as it stood at the tag.

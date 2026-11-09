@@ -1,6 +1,7 @@
 """Checker for import conventions."""
 
 from dataclasses import dataclass
+from pathlib import Path
 import re
 
 from astroid import nodes
@@ -127,6 +128,8 @@ _OBSOLETE_IMPORT: dict[str, list[ObsoleteImportMatch]] = {
     ],
 }
 
+_NOQA_F401 = re.compile(r"#\s*noqa:[^#]*\bF401\b")
+
 _IGNORE_ROOT_IMPORT = (
     "bluetooth",
     "device_tracker",
@@ -167,6 +170,27 @@ _FORCE_NAMESPACE_IMPORT: dict[str, NamespaceAlias] = {
     "homeassistant.helpers.issue_registry": NamespaceAlias("ir", {"async_get"}),
     "homeassistant.helpers.label_registry": NamespaceAlias("lr", {"async_get"}),
 }
+
+
+def _imports_only_submodules(
+    module: nodes.Module, import_node: nodes.Import | nodes.ImportFrom
+) -> bool:
+    """Return True for `from . import x, y` where all names are submodules.
+
+    Such imports preload platforms for their side effect and re-export nothing.
+    """
+    if (
+        not isinstance(import_node, nodes.ImportFrom)
+        or import_node.level != 1
+        or import_node.modname
+        or not module.file
+    ):
+        return False
+    package_dir = Path(module.file).parent
+    return all(
+        (package_dir / f"{name}.py").is_file() or (package_dir / name).is_dir()
+        for name, _ in import_node.names
+    )
 
 
 class HassImportsFormatChecker(BaseChecker):
@@ -212,6 +236,13 @@ class HassImportsFormatChecker(BaseChecker):
             "home-assistant-import-constant-unnecessary-alias",
             "Used when a constant alias is unnecessary",
         ),
+        "C7416": (
+            "Module defines `__all__`: list the re-exported names in `__all__` "
+            "instead of using `# noqa: F401`",
+            "home-assistant-noqa-f401-with-all",
+            "Used when an import in an integration module that defines __all__ "
+            "is marked with noqa: F401",
+        ),
     }
     options = ()
 
@@ -250,12 +281,32 @@ class HassImportsFormatChecker(BaseChecker):
         elif self.custom_test_component is not None:
             self.root_segment_count = 0
 
+        if "__all__" in node.locals and parse_module(node.name):
+            self._check_for_noqa_f401_with_all(node)
+
     def _is_custom_own_import(self, modname: str) -> bool:
         """Return True if *modname* is this custom integration's absolute path."""
         own_root = self.custom_own_root
         return own_root is not None and (
             modname == own_root or modname.startswith(f"{own_root}.")
         )
+
+    def _check_for_noqa_f401_with_all(self, node: nodes.Module) -> None:
+        """Check for `# noqa: F401` markers in a module defining __all__."""
+        with node.stream() as stream:
+            lines = stream.read().decode().splitlines()
+        for import_node in node.nodes_of_class((nodes.Import, nodes.ImportFrom)):
+            # Local imports cannot be exported through the module's __all__
+            if import_node.scope() is not node:
+                continue
+            if not any(
+                _NOQA_F401.search(line)
+                for line in lines[import_node.fromlineno - 1 : import_node.tolineno]
+            ):
+                continue
+            if _imports_only_submodules(node, import_node):
+                continue
+            self.add_message("home-assistant-noqa-f401-with-all", node=import_node)
 
     def visit_import(self, node: nodes.Import) -> None:
         """Check for improper `import _` invocations."""
@@ -269,7 +320,9 @@ class HassImportsFormatChecker(BaseChecker):
                 other_parsed := parse_module(other_module)
             ) and other_parsed.module is not None:
                 if (
-                    self.current_package.startswith("tests.components.")
+                    self.current_package.startswith(
+                        ("tests.components.", "pytest_homeassistant.components.")
+                    )
                     and self.current_package.split(".")[2] == other_parsed.domain
                 ) or self.custom_test_component == other_parsed.domain:
                     # Ignore check if the component being tested matches

@@ -7,7 +7,11 @@ from pathlib import Path
 from astroid import nodes
 
 from ha_custom_pylint.const import IntegrationType
-from ha_custom_pylint.helpers.module_info import is_test_module, parse_module
+from ha_custom_pylint.helpers.module_info import (
+    IntegrationModule,
+    is_test_module,
+    parse_module,
+)
 
 # Caches keyed by integration domain.  Shared across all checkers so the
 # same manifest is read at most once per pylint run.
@@ -53,6 +57,23 @@ def custom_test_domain(module: nodes.Module) -> str | None:
     return _custom_test_domain_cache[repo_root]
 
 
+def parse_test_module(module: nodes.Module) -> IntegrationModule | None:
+    """Return ``parse_module(module.name, include_test=True)``, or a repo-root test.
+
+    ha_custom_pylint: a repo-root ``tests.<name>`` module tests the one custom
+    integration beside it, so it parses as that domain under the root ``tests``,
+    with ``<name>`` as its module, where core's would be ``tests.components``.
+    """
+    if (parsed := parse_module(module.name, include_test=True)) is not None:
+        return parsed
+    if (domain := custom_test_domain(module)) is None:
+        return None
+    parts = module.name.split(".")
+    return IntegrationModule(
+        root="tests", domain=domain, module=parts[1] if len(parts) > 1 else None
+    )
+
+
 def get_integration_dir(module: nodes.Module) -> Path | None:
     """Derive the integration directory from *module*'s file path.
 
@@ -70,6 +91,22 @@ def get_integration_dir(module: nodes.Module) -> Path | None:
         if parent.name != "custom_components" and parent.parent.name == "":
             break
     return None
+
+
+def get_tested_integration_dir(module: nodes.Module) -> Path | None:
+    """Return the integration directory that a ``tests/components`` module tests.
+
+    Returns ``None`` when *module* is not inside ``tests/components``.
+    """
+    # ha_custom_pylint: a repo-root tests/ tests custom_components/<domain>.
+    if (domain := custom_test_domain(module)) is not None:
+        file_path = Path(module.file)
+        depth = module.name.count(".") + (file_path.name == "__init__.py")
+        return file_path.parents[depth] / "custom_components" / domain
+    test_dir = get_integration_dir(module)
+    if test_dir is None or test_dir.parent.parent.name != "tests":
+        return None
+    return test_dir.parents[2] / "homeassistant" / "components" / test_dir.name
 
 
 def read_manifest(module: nodes.Module) -> dict | None:
