@@ -38,9 +38,7 @@ from ha_custom_pylint.checkers.quality_scale.parallel_updates import (  # noqa: 
 from ha_custom_pylint.checkers.tests.direct_async_migrate_entry import (  # noqa: E402
     DirectAsyncMigrateEntry,
 )
-from ha_custom_pylint.checkers.tests.direct_async_setup import (  # noqa: E402
-    DirectAsyncSetup,
-)
+from ha_custom_pylint.checkers.tests.direct_async_setup import DirectAsyncSetup  # noqa: E402
 from ha_custom_pylint.checkers.tests.direct_async_setup_entry import (  # noqa: E402
     DirectAsyncSetupEntry,
 )
@@ -49,9 +47,7 @@ from ha_custom_pylint.checkers.tests.direct_async_unload_entry import (  # noqa:
 )
 from ha_custom_pylint.helpers import module_info  # noqa: E402
 from ha_custom_pylint.helpers.integration import clear_caches  # noqa: E402
-from ha_custom_pylint.helpers.quality_scale import (  # noqa: E402
-    clear_quality_scale_cache,
-)
+from ha_custom_pylint.helpers.quality_scale import clear_quality_scale_cache  # noqa: E402
 
 _UPSTREAM = json.loads((_PLUGINS / "ha_custom_pylint" / "UPSTREAM.json").read_text())
 CARRIED = sorted(_UPSTREAM["carried"])
