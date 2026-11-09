@@ -49,8 +49,12 @@ step runs against the consumer's own checkout.
   rules are synced to a new core tag, since `tests/test_python_validate.py` holds it to
   the tag `UPSTREAM.json` records. Pytest's
   `--timeout=9` is core's per-test limit, so a hung test fails in seconds rather than at
-  the job timeout; the flag comes from `pytest-timeout`, which the pinned test harness
-  brings. The job name says what the job is for rather than which tools it runs, because
+  the job timeout; the flag comes from `pytest-timeout`, which
+  pytest-homeassistant-custom-component brings. Core's `pytest-homeassistant` brings
+  neither `pytest-timeout` nor `pytest-cov`, so with it pinned the install step adds
+  both at the versions core 2026.11.0's `requirements_test.txt` pins, in the same
+  resolve as `requirements.test.txt`, so a clash with a pin of the consumer's own fails
+  the install rather than one silently replacing the other. The job name says what the job is for rather than which tools it runs, because
   it is half of every consumer's required context: swapping a tool must not rename the
   check.
 - **The translation check** is `pytest_plugins/ha_translations.py`, a port of the autouse
@@ -83,7 +87,8 @@ step runs against the consumer's own checkout.
   the whole file. It fails any line of one that no test ran, and any of them no test
   imported. Without `tests/` python-validate runs the gate on a report that does not
   exist, which it reads as nothing having run. Other
-  modules carry no threshold here. pytest-cov arrives with the pinned test harness.
+  modules carry no threshold here. pytest-cov arrives with the community test harness,
+  and the install step adds it beside core's.
 - **The pylint rules** are `pylint_plugins/ha_custom_pylint`, our own copy of the plugin
   in core's `pylint/plugins`, taken at 2026.9.0 and synced to 2026.10.2, the release
   consumers test against, under Apache-2.0 with its `NOTICE`. Core's
@@ -269,11 +274,16 @@ of it, not a substitute.
   behind it, `test-coverage` marked `done` while a `frontend/` holds no `*.test.ts` or
   `*.spec.ts`, a `strings.json` in the integration (Home Assistant loads
   `translations/<language>.json` and never `strings.json`), a `translations/en.json` that
-  carries a `[%key:…%]` reference (only core resolves those references, at build time), a
-  `tests/conftest.py` that imports
-  `custom_components` and pulls in `enable_custom_integrations`,
-  `asyncio_mode = "auto"`, the pinned test harness (a
-  warning when unpinned), a `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
+  carries a `[%key:…%]` reference (only core resolves those references, at build time),
+  `asyncio_mode = "auto"`, the pinned test harness (a warning when unpinned), and what
+  that harness needs: on pytest-homeassistant-custom-component, a `tests/conftest.py`
+  that imports `custom_components` and pulls in `enable_custom_integrations`; on core's
+  `pytest-homeassistant`, which enables custom integrations itself and needs no
+  conftest, `-p no:respx` in the pytest `addopts` of `pyproject.toml`, since Home
+  Assistant 2026.11 aliases `httpx` to `httpx2` and raises once respx's pytest plugin has
+  imported `httpx` first. The audit cannot tell from a community harness version which
+  Home Assistant it brings, so it asks for `-p no:respx` on core's harness only; a
+  community harness that pins 2026.11 needs it too. A `mypy.ini` (a leftover `pyrightconfig.json` warns), a `home-assistant-frontend` pin in `requirements.test.txt` whenever the manifest
   depends on `frontend` or `panel_custom`, a `test` script in `frontend/package.json` (a
   warning), and `brand/icon.png`, the one brand file HACS gates a listing on — every other
   brand rule is quality and warns, a logo included, since the brands README says to ship
@@ -300,7 +310,14 @@ of it, not a substitute.
 `version_sync.py` compares the Python version across every workflow that sets one up in
 the consumer's own `.github/workflows/`, the three reusable workflows in the
 `.ha-integration-ci/` checkout beside it, ruff's `target-version` and the
-`python_version` in `mypy.ini`'s `[mypy]` section, and requires the test harness to be pinned. A consumer's own
+`python_version` in `mypy.ini`'s `[mypy]` section, and requires `requirements.test.txt`,
+when it exists, to pin exactly one test harness: core's `pytest-homeassistant`, released
+once per Home Assistant release, pinned with `==` to one release such as `2026.11.0`, or
+`pytest-homeassistant-custom-component` with `==`, which a repository testing Home
+Assistant 2026.10 or older stays on. A range, a wildcard or no pin on core's harness
+fails, because PyPI also carries an unrelated `pytest-homeassistant` 0.1.x from 2020 by
+another author, and so does a pin of that 0.1.x. Naming both harnesses fails, since
+they supply the same fixtures. A consumer's own
 workflows are callers and declare nothing, so the comparison that matters is its floor
 against the CI it runs; this repository's own `ci.yml` is read by its own CI, not by a
 consumer's.
@@ -414,7 +431,11 @@ the suite reaches. It installs pytest-homeassistant-custom-component at the vers
 skill's template pins, because `tests/test_ha_translations.py` runs a sample integration's
 suite under the plugin in a child pytest; `-p no:homeassistant` keeps that harness out of
 this suite's own run, whose sync tests its autouse async fixtures would break, and the
-test module skips when the harness is absent. It installs pylint and astroid at
+test module skips when no harness is present. The two harnesses cannot share an
+environment, so a second job, `Translation check on core's harness`, installs core's
+`pytest-homeassistant` alone and runs that module again under
+`-p no:pytest_homeassistant`, proving the plugin on the harness a consumer on Home
+Assistant 2026.11 or newer runs. It installs pylint and astroid at
 python-validate's pins, because `tests/test_ha_custom_pylint.py` lints sample
 repositories with the pylint rules in a child pylint and skips without them.
 
