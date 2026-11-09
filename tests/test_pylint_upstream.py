@@ -319,6 +319,30 @@ def test_the_download_keeps_only_the_plugin_python_files(monkeypatch) -> None:
     assert files == {"checkers/a.py": _CHECKER_A.encode()}
 
 
+def test_the_plugin_is_read_from_core_s_package() -> None:
+    """From 2026.11.0 core ships the plugin as a package under packages/."""
+    tarball = _tarball(
+        {
+            "core-2026.11.1/packages/pylint-home-assistant/pylint_home_assistant/"
+            "checkers/a.py": _CHECKER_A,
+            "core-2026.11.1/packages/pylint-home-assistant/pyproject.toml": "[x]\n",
+        }
+    )
+    files = upstream.plugin_files_from_tarball(io.BytesIO(tarball))
+    assert files == {"checkers/a.py": _CHECKER_A.encode()}
+
+
+def test_a_tag_from_before_the_move_says_so() -> None:
+    """Before 2026.11.0 the plugin sat in pylint/plugins/, which is no longer read."""
+    tarball = _tarball(
+        {
+            "core-2026.10.2/pylint/plugins/pylint_home_assistant/checkers/a.py": _CHECKER_A
+        }
+    )
+    with pytest.raises(FileNotFoundError, match=r"2026\.11\.0"):
+        upstream.plugin_files_from_tarball(io.BytesIO(tarball))
+
+
 def test_a_tarball_without_the_plugin_is_an_error() -> None:
     """A tag from before the plugin existed must not read as 'everything removed'."""
     with pytest.raises(FileNotFoundError):

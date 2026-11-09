@@ -35,7 +35,10 @@ from typing import IO, Any
 import urllib.error
 import urllib.request
 
-PLUGIN_PATH = "pylint/plugins/pylint_home_assistant"
+# Core ships the plugin as its own package from 2026.11.0; before that it sat in
+# pylint/plugins/pylint_home_assistant, which a tag from before the move still has.
+PLUGIN_PATH = "packages/pylint-home-assistant/pylint_home_assistant"
+MOVED_AT = "2026.11.0"
 TARBALL_URL = "https://codeload.github.com/home-assistant/core/tar.gz/refs/tags/{tag}"
 ATTEMPTS = 3
 # urlopen wraps a failure while connecting in a URLError; a reset, timeout or
@@ -111,7 +114,10 @@ def plugin_files_from_tarball(stream: IO[bytes]) -> dict[str, bytes]:
             if extracted is not None:
                 files[inner.relative_to(PLUGIN_PATH).as_posix()] = extracted.read()
     if not files:
-        msg = f"no {PLUGIN_PATH}/*.py in the tarball"
+        msg = (
+            f"no {PLUGIN_PATH}/*.py in the tarball; core moved the plugin there at "
+            f"{MOVED_AT}, so a tag before it cannot be compared"
+        )
         raise FileNotFoundError(msg)
     return files
 
