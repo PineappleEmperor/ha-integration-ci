@@ -2,10 +2,12 @@
 
 Each test builds a one-integration repository in a temporary directory and runs its
 suite in a child pytest with the plugin loaded, the way python-validate.yml runs a
-consumer's. The child needs pytest-homeassistant-custom-component; this suite's own run
-must not load it, which is why ci.yml passes `-p no:homeassistant` here.
+consumer's. The child needs a test harness, pytest-homeassistant-custom-component or
+core's pytest-homeassistant, whichever is installed; this suite's own run must not load
+it, which is why ci.yml passes `-p no:homeassistant` or `-p no:pytest_homeassistant`.
 """
 
+import importlib.util
 import json
 import os
 import pathlib
@@ -14,7 +16,16 @@ import sys
 
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
+_HARNESS = next(
+    (
+        name
+        for name in ("pytest_homeassistant_custom_component", "pytest_homeassistant")
+        if importlib.util.find_spec(name)
+    ),
+    None,
+)
+if _HARNESS is None:
+    pytest.skip("no Home Assistant test harness installed", allow_module_level=True)
 
 _PLUGINS = pathlib.Path(__file__).resolve().parents[1] / "pytest_plugins"
 
@@ -385,7 +396,7 @@ _SUBENTRY_ABORT_CASE = '''"""The subentry flow aborts."""
 
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from {harness}.common import MockConfigEntry
 
 
 async def test_subentry_abort(hass: HomeAssistant) -> None:
@@ -396,7 +407,7 @@ async def test_subentry_abort(hass: HomeAssistant) -> None:
         (entry.entry_id, "thing"), context={"source": "user"}
     )
     assert result["type"] is FlowResultType.ABORT
-'''
+'''.replace("{harness}", _HARNESS)
 
 
 def test_a_local_copy_of_a_shared_subentry_abort_translation_fails(tmp_path) -> None:

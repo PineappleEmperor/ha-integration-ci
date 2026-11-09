@@ -6,6 +6,8 @@ Load the standalone script by path; it is not an importable package.
 import importlib.util
 import pathlib
 
+import pytest
+
 _SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / "scripts"
 _SPEC = importlib.util.spec_from_file_location(
     "version_sync", _SCRIPTS / "version_sync.py"
@@ -28,7 +30,14 @@ def _mypy(version: str) -> str:
     )
 
 
-def _repo(tmp_path, *, workflow="3.14", ruff="py314", mypy="3.14", pin=True):
+def _repo(
+    tmp_path,
+    *,
+    workflow="3.14",
+    ruff="py314",
+    mypy="3.14",
+    reqs="pytest-homeassistant-custom-component==0.13.354\n",
+):
     """A repo declaring the python version in each of the places that carry it."""
     (tmp_path / ".github/workflows").mkdir(parents=True)
     (tmp_path / ".github/workflows/python-validate.yml").write_text(
@@ -38,11 +47,7 @@ def _repo(tmp_path, *, workflow="3.14", ruff="py314", mypy="3.14", pin=True):
         f'[tool.ruff]\ntarget-version = "{ruff}"\n'
     )
     (tmp_path / "mypy.ini").write_text(_mypy(mypy))
-    (tmp_path / "requirements.test.txt").write_text(
-        "pytest-homeassistant-custom-component==0.13.354\n"
-        if pin
-        else "pytest-homeassistant-custom-component\n"
-    )
+    (tmp_path / "requirements.test.txt").write_text(reqs)
     return tmp_path
 
 
@@ -61,8 +66,64 @@ def test_a_bump_left_behind_is_caught(tmp_path) -> None:
 
 def test_unpinned_test_harness_is_caught(tmp_path) -> None:
     """An unpinned test harness."""
-    found = vs.problems(_repo(tmp_path, pin=False))
-    assert any("does not pin pytest-homeassistant-custom-component" in f for f in found)
+    found = vs.problems(_repo(tmp_path, reqs="pytest-homeassistant-custom-component\n"))
+    assert len(found) == 1
+    assert "pins no test harness" in found[0]
+
+
+def test_requirements_without_any_harness_are_caught(tmp_path) -> None:
+    """A requirements file naming neither harness pins no HA release at all."""
+    found = vs.problems(_repo(tmp_path, reqs="pytest-cov==7.1.0\n"))
+    assert len(found) == 1
+    assert "pins no test harness" in found[0]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "pytest-homeassistant==2026.11.0",
+        "pytest-homeassistant[bluetooth]==2026.11.0",
+        "pytest-homeassistant == 2026.11.0b4  # the release under test",
+        "pytest_homeassistant==2026.11.1",
+    ],
+)
+def test_core_s_harness_pinned_exactly_passes(tmp_path, line: str) -> None:
+    """Core's own harness, pinned to one Home Assistant release, is a pin."""
+    assert vs.problems(_repo(tmp_path, reqs=f"{line}\n")) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "pytest-homeassistant",
+        "pytest-homeassistant>=2026.11.0",
+        "pytest-homeassistant~=2026.11.0",
+        "pytest-homeassistant==2026.11.*",
+        "pytest-homeassistant==2026.11.0,<2026.12",
+        "pytest-homeassistant==0.1.3",
+    ],
+)
+def test_core_s_harness_not_pinned_to_a_release_fails(tmp_path, line: str) -> None:
+    """Anything but one exact HA release can resolve to another author's 0.1.x."""
+    found = vs.problems(_repo(tmp_path, reqs=f"{line}\n"))
+    assert len(found) == 1
+    assert "pytest-homeassistant==<Home Assistant release>" in found[0]
+    assert line in found[0]
+
+
+def test_both_harnesses_pinned_fail(tmp_path) -> None:
+    """Core's package and the community one supply the same fixtures; never both."""
+    found = vs.problems(
+        _repo(
+            tmp_path,
+            reqs=(
+                "pytest-homeassistant==2026.11.0\n"
+                "pytest-homeassistant-custom-component==0.13.375\n"
+            ),
+        )
+    )
+    assert len(found) == 1
+    assert "both" in found[0]
 
 
 def test_absent_files_are_not_a_disagreement(tmp_path) -> None:

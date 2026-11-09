@@ -375,6 +375,62 @@ def test_a_pytest_pointer_proves_the_suite_runs(tmp_path) -> None:
     assert audit.check_claims_have_tests(audit.Repo(root)) == ([], [])
 
 
+def _core_harness(root: pathlib.Path, pytest_table: str) -> pathlib.Path:
+    """Switch a tested integration to core's harness, with *pytest_table* as its config."""
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    (root / "requirements.test.txt").write_text("pytest-homeassistant==2026.11.0\n")
+    (root / "pyproject.toml").write_text(pytest_table)
+    return root
+
+
+_CORE_PYTEST = (
+    '[tool.pytest.ini_options]\nasyncio_mode = "auto"\naddopts = "-p no:respx"\n'
+)
+
+
+def test_core_s_harness_needs_no_conftest(tmp_path) -> None:
+    """Core's harness enables custom integrations itself, so no conftest wires them."""
+    root = _core_harness(_tested_integration(tmp_path), _CORE_PYTEST)
+    (root / "tests/conftest.py").unlink()
+    assert audit.check_claims_have_tests(audit.Repo(root)) == ([], [])
+
+    (root / "tests/conftest.py").write_text('"""Fixtures."""\n')
+    assert audit.check_claims_have_tests(audit.Repo(root)) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "addopts",
+    ['"-p no:respx"', '"--strict-markers -pno:respx"', '["-p", "no:respx"]'],
+)
+def test_core_s_harness_with_respx_disabled_passes(tmp_path, addopts: str) -> None:
+    """Each spelling pytest accepts for disabling the respx plugin counts."""
+    table = f'[tool.pytest.ini_options]\nasyncio_mode = "auto"\naddopts = {addopts}\n'
+    root = _core_harness(_tested_integration(tmp_path), table)
+    assert audit.check_claims_have_tests(audit.Repo(root)) == ([], [])
+
+
+def test_core_s_harness_without_respx_disabled_fails(tmp_path) -> None:
+    """HA 2026.11 aliases httpx to httpx2, which fails once respx has imported httpx."""
+    root = _core_harness(
+        _tested_integration(tmp_path),
+        '[tool.pytest.ini_options]\nasyncio_mode = "auto"\n',
+    )
+    fails, _ = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(fails) == 1
+    assert '"-p no:respx"' in fails[0]
+
+
+def test_an_unpinned_harness_warns(tmp_path) -> None:
+    """Neither harness pinned: the suite follows whichever HA release is current."""
+    root = _tested_integration(tmp_path)
+    _wf(root, "python-validate.yml", _caller(f"{_CI}/python-validate.yml"))
+    (root / "requirements.test.txt").write_text(
+        "pytest-homeassistant-custom-component\n"
+    )
+    _, warns = audit.check_claims_have_tests(audit.Repo(root))
+    assert len(warns) == 1 and "unpinned" in warns[0]
+
+
 def test_a_validate_body_without_pytest_fails(tmp_path) -> None:
     """A repo carrying its own body must run pytest in it, as before."""
     root = _tested_integration(tmp_path)

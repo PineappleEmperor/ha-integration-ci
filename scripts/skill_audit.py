@@ -20,6 +20,7 @@ import re
 import struct
 import subprocess
 import sys
+import tomllib
 
 import yaml
 
@@ -551,6 +552,13 @@ def _status(value) -> str | None:
     return value if isinstance(value, str) else (value or {}).get("status")
 
 
+# Core's own harness, as distinct from pytest-homeassistant-custom-component; whether
+# it is pinned to one release is version_sync.py's to judge.
+CORE_HARNESS = re.compile(
+    r"^[ \t]*pytest[-_.]homeassistant(?![-_.\w])", re.MULTILINE | re.IGNORECASE
+)
+
+
 def check_claims_have_tests(repo: Repo) -> Result:
     """A `done` with no test is a claim, not evidence."""
     rules = _quality_scale(repo)
@@ -572,7 +580,17 @@ def check_claims_have_tests(repo: Repo) -> Result:
                 "tests/ exists but requirements.test.txt is missing (pytest step "
                 "cannot install the suite)"
             )
-        if repo.exists("tests/conftest.py"):
+        core_harness = bool(CORE_HARNESS.search(repo.text("requirements.test.txt")))
+        if core_harness:
+            # Core's harness enables custom integrations itself, so no conftest has
+            # to; it does need the respx plugin off, which HA 2026.11 requires.
+            if not _disables_respx(repo.text("pyproject.toml")):
+                fails.append(
+                    'pyproject.toml\'s pytest addopts lacks "-p no:respx" (Home '
+                    "Assistant 2026.11 aliases httpx to httpx2 and fails once the "
+                    "respx plugin has imported httpx)"
+                )
+        elif repo.exists("tests/conftest.py"):
             conftest = repo.text("tests/conftest.py")
             if not re.search(r"^import custom_components", conftest, re.MULTILINE):
                 fails.append(
@@ -611,14 +629,27 @@ def check_claims_have_tests(repo: Repo) -> Result:
         repo.exists("requirements.test.txt")
         and repo.cc
         and not re.search(
-            r"pytest-homeassistant-custom-component\s*==",
+            r"pytest-homeassistant(?:-custom-component)?(?:\[[^\]]*\])?\s*==",
             repo.text("requirements.test.txt"),
         )
     ):
-        warns.append(
-            "pytest-homeassistant-custom-component is unpinned in requirements.test.txt"
-        )
+        warns.append("the test harness is unpinned in requirements.test.txt")
     return fails, warns
+
+
+def _disables_respx(pyproject: str) -> bool:
+    """Whether the pytest config in *pyproject* passes `-p no:respx`."""
+    try:
+        tool = tomllib.loads(pyproject).get("tool", {})
+    except tomllib.TOMLDecodeError:
+        return False
+    pytest_cfg = tool.get("pytest", {})
+    addopts = [
+        pytest_cfg.get("ini_options", {}).get("addopts", ""),
+        pytest_cfg.get("addopts", ""),
+    ]
+    flat = " ".join(" ".join(a) if isinstance(a, list) else str(a) for a in addopts)
+    return re.search(r"(?:^|\s)-p\s*no:respx(?:\s|$)", flat) is not None
 
 
 def check_action_pins(repo: Repo) -> Result:
