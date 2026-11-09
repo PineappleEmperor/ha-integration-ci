@@ -25,28 +25,9 @@ jobs:
           cache-dependency-glob: pyproject.toml
       - run: >-
           uv pip install --system --quiet pyyaml ruff==0.17.3 pytest
-          pytest-homeassistant-custom-component==0.13.375
-          pylint==4.0.8 astroid==4.0.4
+          pytest-homeassistant==2026.11.1
+          pylint==4.1.3 astroid==4.3.4
       - run: ruff check .
       - run: ruff format --check .
-      - run: python -m pytest tests/ -q -p no:homeassistant
+      - run: python -m pytest tests/ -q -p no:pytest_homeassistant -p no:respx
       - run: python scripts/version_sync.py --root .
-
-  core-harness:
-    name: Translation check on core's harness
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: '3.14'
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          enable-cache: true
-          cache-dependency-glob: pyproject.toml
-      - run: uv pip install --system --quiet pytest pytest-homeassistant==2026.11.0
-      - run: >-
-          python -m pytest tests/test_ha_translations.py -q
-          -p no:pytest_homeassistant
